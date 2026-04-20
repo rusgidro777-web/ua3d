@@ -6,30 +6,63 @@
     <title>UA 3D PLUS Shop</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        body { font-family: sans-serif; background-color: #1c1c1c; color: white; text-align: center; padding: 20px; }
-        .item { background: #2d2d2d; border-radius: 10px; padding: 15px; margin-bottom: 20px; border: 1px solid #444; }
-        button { background-color: #0088cc; color: white; border: none; padding: 12px 24px; border-radius: 8px; font-weight: bold; cursor: pointer; }
+        body { font-family: sans-serif; background-color: #1a1a1a; color: white; padding: 10px; margin: 0; }
+        .card { background: #262626; border-radius: 15px; padding: 15px; margin-bottom: 15px; border: 1px solid #333; text-align: center; }
+        .card img { width: 100%; border-radius: 10px; margin-bottom: 10px; display: none; } /* Скрыто, если нет фото */
+        .price { color: #00d2ff; font-size: 1.3em; font-weight: bold; margin: 10px 0; }
+        button { background: #0088cc; color: white; border: none; padding: 12px; border-radius: 10px; width: 100%; font-weight: bold; cursor: pointer; }
     </style>
 </head>
 <body>
-    <h1>Магазин UA 3D PLUS</h1>
-    <div class="item">
-        <h3>🚗 Колпачки на фаркоп</h3>
-        <p>Индивидуальный дизайн, Viking-style, Pudge и другие.</p>
-        <button onclick="sendOrder('Колпачок на фаркоп')">Заказать</button>
-    </div>
-    <div class="item">
-        <h3>🦖 Flexi-игрушки</h3>
-        <p>Подвижные драконы и антистресс-фигурки.</p>
-        <button onclick="sendOrder('Flexi-игрушка')">Заказать</button>
-    </div>
+    <h1 style="text-align: center;">Каталог UA 3D PLUS</h1>
+    <div id="catalog">Загрузка товаров...</div>
+
     <script>
         let tg = window.Telegram.WebApp;
         tg.expand();
-        function sendOrder(name) {
-            tg.sendData("Заказ: " + name);
+
+        const CSV_URL = 'ССЫЛКА_НА_ТВОЙ_CSV'; // ВСТАВЬ СВОЮ ССЫЛКУ СЮДА
+        const PRICE_PER_GRAM = 6; // Твоя цена за грамм
+
+        async function loadCatalog() {
+            try {
+                const response = await fetch(CSV_URL);
+                const data = await response.text();
+                const rows = data.split('\n').slice(1); // Пропускаем шапку таблицы
+                
+                let html = '';
+                rows.forEach(row => {
+                    const columns = row.split(',');
+                    if (columns.length < 3) return;
+
+                    const name = columns[0];
+                    const desc = columns[1];
+                    const weight = parseFloat(columns[2]);
+                    const photo = columns[3] ? columns[3].trim() : '';
+                    const price = Math.round(weight * PRICE_PER_GRAM);
+
+                    html += `
+                        <div class="card">
+                            ${photo ? `<img src="${photo}" style="display:block;">` : ''}
+                            <h3>${name}</h3>
+                            <p style="color:#aaa; font-size:0.9em;">${desc}</p>
+                            <div class="price">${price} грн</div>
+                            <button onclick="order('${name}', ${price})">Заказать</button>
+                        </div>
+                    `;
+                });
+                document.getElementById('catalog').innerHTML = html;
+            } catch (e) {
+                document.getElementById('catalog').innerText = 'Ошибка загрузки данных';
+            }
+        }
+
+        function order(name, price) {
+            tg.sendData(`Заказ: ${name} | Цена: ${price}грн`);
             tg.close();
         }
+
+        loadCatalog();
     </script>
 </body>
 </html>
