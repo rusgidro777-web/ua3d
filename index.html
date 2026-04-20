@@ -6,60 +6,85 @@
     <title>UA 3D PLUS Shop</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        body { font-family: sans-serif; background-color: #1a1a1a; color: white; padding: 10px; margin: 0; text-align: center; }
-        .categories { display: flex; overflow-x: auto; gap: 10px; padding: 10px 0; margin-bottom: 15px; scrollbar-width: none; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #121212; color: #e0e0e0; padding: 10px; margin: 0; }
+        h2 { color: white; margin-top: 10px; }
+        
+        /* Стили для категорий */
+        .categories { display: flex; overflow-x: auto; gap: 8px; padding: 10px 0; margin-bottom: 15px; -webkit-overflow-scrolling: touch; }
         .categories::-webkit-scrollbar { display: none; }
-        .cat-btn { background: #333; color: white; border: 1px solid #444; padding: 8px 15px; border-radius: 20px; white-space: nowrap; cursor: pointer; }
-        .cat-btn.active { background: #0088cc; border-color: #0088cc; }
-        .card { background: #262626; border-radius: 15px; padding: 15px; margin-bottom: 15px; border: 1px solid #333; }
-        .card img { width: 100%; border-radius: 10px; margin-bottom: 10px; display: none; }
-        .price { color: #00d2ff; font-size: 1.3em; font-weight: bold; margin: 10px 0; }
-        button.buy-btn { background: #0088cc; color: white; border: none; padding: 12px; border-radius: 10px; width: 100%; font-weight: bold; }
+        .cat-btn { background: #2a2a2a; color: #bbb; border: 1px solid #444; padding: 8px 16px; border-radius: 20px; white-space: nowrap; cursor: pointer; transition: 0.3s; }
+        .cat-btn.active { background: #0088cc; color: white; border-color: #0088cc; box-shadow: 0 0 10px rgba(0,136,204,0.4); }
+        
+        /* Карточки товаров */
+        #catalog { display: grid; gap: 15px; }
+        .card { background: #1e1e1e; border-radius: 15px; padding: 15px; border: 1px solid #333; text-align: center; }
+        .card img { width: 100%; border-radius: 10px; margin-bottom: 12px; object-fit: cover; max-height: 250px; display: none; }
+        .card h3 { margin: 10px 0 5px 0; font-size: 1.1em; color: white; }
+        .card p { color: #999; font-size: 0.9em; line-height: 1.4; margin-bottom: 10px; }
+        
+        .price-row { display: flex; justify-content: center; align-items: center; margin: 15px 0; }
+        .price { color: #00d2ff; font-size: 1.4em; font-weight: bold; }
+        
+        button.buy-btn { background: #0088cc; color: white; border: none; padding: 12px; border-radius: 10px; width: 100%; font-weight: bold; font-size: 1em; cursor: pointer; }
+        button.buy-btn:active { transform: scale(0.98); }
     </style>
 </head>
 <body>
+
     <h2>UA 3D PLUS</h2>
+    
     <div class="categories" id="categories">
         <button class="cat-btn active" onclick="filterCat('Все')">Все</button>
     </div>
-    <div id="catalog">Загрузка...</div>
+
+    <div id="catalog">Загрузка товаров...</div>
 
     <script>
         let tg = window.Telegram.WebApp;
         tg.expand();
 
-        const CSV_URL = 'ВАША_ССЫЛКА_CSV'; 
-        const PRICE_PER_GRAM = 6; 
+        // СЮДА ВСТАВЬ ССЫЛКУ CSV
+        const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQp8hJG9TmZSxSbCNLWPuoDwqurKPHA2JwL7B3kJJ5gpBN2dsJNMgDWPSnoBwdeDbYM9PhH-1HiLyoh/pub?output=csv'; 
+        const PRICE_PER_GRAM = 5; 
         let allProducts = [];
 
         async function loadCatalog() {
             try {
                 const response = await fetch(CSV_URL);
                 const data = await response.text();
-                const rows = data.split('\n').filter(row => row.trim() !== '').slice(1);
+                
+                // Очистка данных от случайных символов кода
+                const rows = data.split('\n').filter(row => row.trim() !== '' && !row.includes('{')).slice(1);
                 
                 const catContainer = document.getElementById('categories');
                 const cats = new Set();
 
                 allProducts = rows.map(row => {
-                    const col = row.split(',');
-                    const p = {
-                        name: col[0]?.trim(),
-                        desc: col[1]?.trim(),
-                        weight: parseFloat(col[2]),
-                        photo: col[3]?.trim(),
-                        cat: col[4]?.trim() || 'Разное'
-                    };
-                    if (p.cat) cats.add(p.cat);
-                    return p;
-                });
+                    const col = row.split(',').map(c => c.trim().replace(/^"|"$/g, ''));
+                    if (col.length < 3) return null;
 
+                    const weight = parseFloat(col[2]);
+                    const category = col[4] || 'Разное';
+                    if (category) cats.add(category);
+
+                    return {
+                        name: col[0],
+                        desc: col[1],
+                        weight: weight,
+                        photo: col[3],
+                        cat: category
+                    };
+                }).filter(p => p !== null && !isNaN(p.weight));
+
+                // Создаем кнопки категорий
                 cats.forEach(c => {
                     catContainer.innerHTML += `<button class="cat-btn" onclick="filterCat('${c}')">${c}</button>`;
                 });
 
                 renderProducts('Все');
-            } catch (e) { document.getElementById('catalog').innerText = 'Ошибка загрузки'; }
+            } catch (e) {
+                document.getElementById('catalog').innerText = 'Ошибка загрузки. Проверьте таблицу.';
+            }
         }
 
         function renderProducts(category) {
@@ -68,26 +93,29 @@
             
             filtered.forEach(p => {
                 const price = Math.round(p.weight * PRICE_PER_GRAM);
-                if (isNaN(price)) return;
                 html += `
                     <div class="card">
-                        ${p.photo ? `<img src="${p.photo}" style="display:block;">` : ''}
+                        ${p.photo ? `<img src="${p.photo}" style="display:block;" onerror="this.style.display='none'">` : ''}
                         <h3>${p.name}</h3>
-                        <p style="color:#aaa; font-size:0.9em;">${p.desc}</p>
-                        <div class="price">${price} грн</div>
+                        <p>${p.desc}</p>
+                        <div class="price-row">
+                            <div class="price">${price} грн</div>
+                        </div>
                         <button class="buy-btn" onclick="order('${p.name}', ${price})">Заказать</button>
                     </div>`;
             });
-            document.getElementById('catalog').innerHTML = html;
+            document.getElementById('catalog').innerHTML = html || 'В этой категории пока нет товаров';
         }
 
         function filterCat(cat) {
-            document.querySelectorAll('.cat-btn').forEach(b => b.classList.toggle('active', b.innerText === cat));
+            document.querySelectorAll('.cat-btn').forEach(b => {
+                b.classList.toggle('active', b.innerText === cat);
+            });
             renderProducts(cat);
         }
 
         function order(name, price) {
-            tg.sendData(`Заказ: ${name} (${price} грн)`);
+            tg.sendData(`Заказ: ${name} | Цена: ${price} грн`);
             tg.close();
         }
 
