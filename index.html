@@ -8,7 +8,7 @@
     <style>
         body { font-family: sans-serif; background-color: #1a1a1a; color: white; padding: 10px; margin: 0; }
         .card { background: #262626; border-radius: 15px; padding: 15px; margin-bottom: 15px; border: 1px solid #333; text-align: center; }
-        .card img { width: 100%; border-radius: 10px; margin-bottom: 10px; display: none; } /* Скрыто, если нет фото */
+        .card img { width: 100%; border-radius: 10px; margin-bottom: 10px; display: none; }
         .price { color: #00d2ff; font-size: 1.3em; font-weight: bold; margin: 10px 0; }
         button { background: #0088cc; color: white; border: none; padding: 12px; border-radius: 10px; width: 100%; font-weight: bold; cursor: pointer; }
     </style>
@@ -21,39 +21,44 @@
         let tg = window.Telegram.WebApp;
         tg.expand();
 
-        const CSV_URL = 'ССЫЛКА_НА_ТВОЙ_CSV'; // ВСТАВЬ СВОЮ ССЫЛКУ СЮДА
-        const PRICE_PER_GRAM = 6; // Твоя цена за грамм
+        // ВСТАВЬТЕ СЮДА ВАШУ ССЫЛКУ С ГУГЛ ТАБЛИЦЫ (output=csv)
+        const CSV_URL = 'ВАША_ССЫЛКА'; 
+        const PRICE_PER_GRAM = 5; 
 
         async function loadCatalog() {
             try {
                 const response = await fetch(CSV_URL);
                 const data = await response.text();
-                const rows = data.split('\n').slice(1); // Пропускаем шапку таблицы
+                // Разбиваем таблицу на строки и убираем пустые
+                const rows = data.split('\n').filter(row => row.trim() !== '').slice(1); 
                 
                 let html = '';
                 rows.forEach(row => {
                     const columns = row.split(',');
                     if (columns.length < 3) return;
 
-                    const name = columns[0];
-                    const desc = columns[1];
-                    const weight = parseFloat(columns[2]);
+                    const name = columns[0].trim();
+                    const desc = columns[1].trim();
+                    const weightStr = columns[2].replace(/[^0-9.]/g, ''); // Оставляем только цифры
+                    const weight = parseFloat(weightStr);
                     const photo = columns[3] ? columns[3].trim() : '';
-                    const price = Math.round(weight * PRICE_PER_GRAM);
 
-                    html += `
-                        <div class="card">
-                            ${photo ? `<img src="${photo}" style="display:block;">` : ''}
-                            <h3>${name}</h3>
-                            <p style="color:#aaa; font-size:0.9em;">${desc}</p>
-                            <div class="price">${price} грн</div>
-                            <button onclick="order('${name}', ${price})">Заказать</button>
-                        </div>
-                    `;
+                    if (!isNaN(weight)) {
+                        const price = Math.round(weight * PRICE_PER_GRAM);
+                        html += `
+                            <div class="card">
+                                ${photo ? `<img src="${photo}" style="display:block;">` : ''}
+                                <h3>${name}</h3>
+                                <p style="color:#aaa; font-size:0.9em;">${desc}</p>
+                                <div class="price">${price} грн</div>
+                                <button onclick="order('${name}', ${price})">Заказать</button>
+                            </div>
+                        `;
+                    }
                 });
-                document.getElementById('catalog').innerHTML = html;
+                document.getElementById('catalog').innerHTML = html || 'Товары не найдены в таблице';
             } catch (e) {
-                document.getElementById('catalog').innerText = 'Ошибка загрузки данных';
+                document.getElementById('catalog').innerText = 'Ошибка загрузки: проверьте ссылку на таблицу';
             }
         }
 
