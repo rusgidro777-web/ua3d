@@ -5,38 +5,73 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        body { font-family: sans-serif; background: #121212; color: white; padding: 15px; margin: 0; }
-        .card { background: #1e1e1e; border-radius: 12px; padding: 15px; border: 1px solid #333; margin-bottom: 15px; }
+        :root { --main: #0088cc; --bg: #121212; --card: #1e1e1e; }
+        body { font-family: sans-serif; background: var(--bg); color: white; margin: 0; padding-bottom: 20px; }
+        .header { padding: 15px; text-align: center; background: var(--card); border-bottom: 1px solid #333; }
+        .categories { display: flex; gap: 10px; overflow-x: auto; padding: 10px; background: #1a1a1a; }
+        .cat-btn { background: #333; color: #ccc; border: none; padding: 8px 15px; border-radius: 20px; white-space: nowrap; }
+        .cat-btn.active { background: var(--main); color: white; }
+        .card { background: var(--card); border-radius: 12px; padding: 15px; margin: 10px; border: 1px solid #333; }
+        .card img { width: 100%; border-radius: 8px; margin-bottom: 10px; }
         input, select { background: #2a2a2a; color: white; border: 1px solid #444; padding: 12px; width: 100%; border-radius: 10px; margin-bottom: 10px; box-sizing: border-box; }
-        .btn { background: #0088cc; color: white; border: none; padding: 15px; width: 100%; border-radius: 10px; font-weight: bold; cursor: pointer; }
+        .btn { background: var(--main); color: white; border: none; padding: 15px; width: 100%; border-radius: 10px; font-weight: bold; cursor: pointer; }
     </style>
 </head>
 <body>
-    <div class="card">
-        <h3>Оформление заказа</h3>
-        <input type="text" id="name" placeholder="ФИО получателя">
-        <input type="text" id="phone" placeholder="Телефон">
-        <input type="text" id="addr" placeholder="Город и № почты">
-        <select id="method">
-            <option value="Карта (Mono)">💳 Карта (Mono)</option>
-            <option value="Наложенный платеж">📦 Почта</option>
-        </select>
-        <button class="btn" onclick="sendOrder()">✅ ПОДТВЕРДИТЬ</button>
-    </div>
+    <div class="header">📋 UA 3D PLUS</div>
+    <div class="categories" id="cat-list"></div>
+    <div id="catalog">Загрузка товаров...</div>
 
     <script>
         let tg = window.Telegram.WebApp;
         tg.expand();
-        function sendOrder() {
+        const CSV_URL = 'https://docs.google.com/spreadsheets/d/1gpBN2dsJNMgDWPSNoBwdeDbYM9PhH-1HiLyoh/pub?output=csv';
+        let allProducts = [];
+
+        async function loadData() {
+            try {
+                const res = await fetch(CSV_URL + '&cache=' + Date.now());
+                const text = await res.text();
+                const rows = text.split('\n').slice(1);
+                allProducts = rows.map(r => {
+                    const c = r.split(',').map(v => v.trim().replace(/^"|"$/g, ''));
+                    return { name: c[0], cat: c[1] || 'Разное', price: c[2] || '0', img: c[3] };
+                }).filter(p => p.name);
+                render();
+            } catch (e) { document.getElementById('catalog').innerText = 'Ошибка связи с таблицей'; }
+        }
+
+        function render(filter = 'Все') {
+            const cats = ['Все', ...new Set(allProducts.map(p => p.cat))];
+            document.getElementById('cat-list').innerHTML = cats.map(c => 
+                `<button class="cat-btn ${filter === c ? 'active' : ''}" onclick="render('${c}')">${c}</button>`
+            ).join('');
+
+            const filtered = filter === 'Все' ? allProducts : allProducts.filter(p => p.cat === filter);
+            document.getElementById('catalog').innerHTML = filtered.map(p => `
+                <div class="card">
+                    <img src="${p.img}" onerror="this.src='https://via.placeholder.com/150'">
+                    <h3>${p.name}</h3>
+                    <p>Цена: ${p.price} грн</p>
+                    <input type="text" id="name-${p.name}" placeholder="ФИО">
+                    <input type="text" id="phone-${p.name}" placeholder="Телефон">
+                    <select id="pay-${p.name}"><option>Карта</option><option>Наложенный</option></select>
+                    <button class="btn" onclick="order('${p.name}', '${p.price}')">Оформить</button>
+                </div>
+            `).join('');
+        }
+
+        function order(name, price) {
             const data = {
-                order: "3D Деталь (UA 3D PLUS)",
-                total: "450",
-                method: document.getElementById('method').value,
-                client: `ФИО: ${document.getElementById('name').value}\nТел: ${document.getElementById('phone').value}\nАдрес: ${document.getElementById('addr').value}`
+                order: name,
+                total: price,
+                method: document.getElementById('pay-'+name).value,
+                client: `ФИО: ${document.getElementById('name-'+name).value}\nТел: ${document.getElementById('phone-'+name).value}`
             };
             tg.sendData(JSON.stringify(data));
             tg.close();
         }
+        loadData();
     </script>
 </body>
 </html>
