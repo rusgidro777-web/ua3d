@@ -3,25 +3,131 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>UA 3D PLUS</title>
+    <title>UA 3D PLUS Shop</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        :root { --main-color: #0088cc; --bg-color: #121212; --card-bg: #1e1e1e; }
-        body { font-family: sans-serif; background: var(--bg-color); color: white; margin: 0; padding: 20px; }
-        .card { background: var(--card-bg); border-radius: 15px; padding: 15px; border: 1px solid #333; margin-bottom: 15px; }
-        .price { color: #00d2ff; font-weight: bold; font-size: 1.2em; }
-        .btn { background: var(--main-color); color: white; border: none; padding: 10px; width: 100%; border-radius: 10px; font-weight: bold; cursor: pointer; }
+        :root { --main: #0088cc; --bg: #121212; --card: #1e1e1e; --success: #28a745; }
+        body { font-family: sans-serif; background: var(--bg); color: white; margin: 0; padding-bottom: 100px; }
+        .header { padding: 15px; text-align: center; background: var(--card); border-bottom: 1px solid #333; }
+        #catalog { padding: 10px; display: grid; gap: 15px; }
+        .card { background: var(--card); border-radius: 15px; padding: 12px; border: 1px solid #333; }
+        .card img { width: 100%; border-radius: 10px; object-fit: cover; max-height: 200px; display: block; }
+        .price { color: #00d2ff; font-size: 1.3em; font-weight: bold; margin: 10px 0; }
+        select, input { background: #2a2a2a; color: white; border: 1px solid #444; padding: 12px; border-radius: 8px; width: 100%; margin-bottom: 10px; box-sizing: border-box; }
+        label { display: block; margin-bottom: 5px; font-size: 0.8em; color: #888; }
+        .add-btn { background: var(--main); color: white; border: none; padding: 12px; border-radius: 10px; width: 100%; font-weight: bold; cursor: pointer; }
+        #orderModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 200; padding: 20px; box-sizing: border-box; flex-direction: column; justify-content: center; }
+        .cart-bar { position: fixed; bottom: 0; left: 0; right: 0; background: var(--card); padding: 15px; border-top: 1px solid #333; display: none; justify-content: space-between; align-items: center; }
+        .pay-btn { background: var(--success); color: white; border: none; padding: 15px; border-radius: 10px; font-weight: bold; width: 100%; margin-top: 10px; }
     </style>
 </head>
 <body>
-    <div class="card">
-        <h2>UA 3D PLUS</h2>
-        <p>Каталог загружается...</p>
-        <button class="btn" onclick="tg.close()">Закрыть</button>
+    <div class="header"><h2>UA 3D PLUS</h2></div>
+    <div id="catalog">Загрузка товаров...</div>
+
+    <div id="orderModal">
+        <h3 style="text-align:center">Оформление заказа</h3>
+        <div id="orderSummary" style="margin-bottom:15px; font-size: 0.9em; color: #bbb; max-height: 150px; overflow-y: auto;"></div>
+        <input type="text" id="name" placeholder="ФИО получателя">
+        <input type="text" id="phone" placeholder="Телефон">
+        <input type="text" id="address" placeholder="Город и № Новой Почты">
+        <button class="pay-btn" onclick="processPayment()">💳 Оплатить и заказать</button>
+        <button onclick="closeModal()" style="background:none; color:#888; border:none; width:100%; margin-top:15px;">Назад</button>
     </div>
-    <script>
-        let tg = window.Telegram.WebApp;
-        tg.expand();
-    </script>
+    
+    <div class="cart-bar" id="cartBar">
+        <div style="font-weight:bold;">Итого: <span id="total">0</span> грн</div>
+        <button class="add-btn" style="width:auto; padding: 10px 20px;" onclick="openModal()">Оформить</button>
+    </div>
+
+<script>
+    let tg = window.Telegram.WebApp;
+    tg.expand();
+
+    const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQp8hJG9TmZSxSbCNLWPuoDwqurKPHA2JwL7B3kJJ5gpBN2dsJNMgDWPSnoBwdeDbYM9PhH-1HiLyoh/pub?output=csv'; 
+    const GRAM_PRICE = 6; 
+    let products = [];
+    let cart = {};
+
+    async function init() {
+        try {
+            const res = await fetch(CSV_URL + '&cache=' + Date.now());
+            const text = await res.text();
+            const rows = text.split('\n').slice(1);
+            products = rows.map((r, i) => {
+                const c = r.split(',').map(v => v.trim().replace(/^"|"$/g, ''));
+                if (c.length < 3) return null;
+                // Цвета из колонки F (индекс 5)
+                return { id: i, name: c[0], desc: c[1], weight: parseFloat(c[2]), img: c[3], colors: c[5] ? c[5].split(';') : ['Черный', 'Белый'] };
+            }).filter(p => p);
+            render();
+        } catch (e) { document.getElementById('catalog').innerText = "Ошибка загрузки!"; }
+    }
+
+    function render() {
+        let html = '';
+        products.forEach(p => {
+            const price = Math.round(p.weight * GRAM_PRICE);
+            html += `<div class="card">
+                <img src="${p.img}" onerror="this.style.display='none'">
+                <h3>${p.name}</h3>
+                <div class="price">${price} грн</div>
+                <label>Выберите цвет:</label>
+                <select id="col-${p.id}">${p.colors.map(color => `<option>${color}</option>`).join('')}</select>
+                <button class="add-btn" onclick="addToCart(${p.id})">В корзину</button>
+            </div>`;
+        });
+        document.getElementById('catalog').innerHTML = html;
+    }
+
+    function addToCart(id) {
+        const p = products.find(x => x.id === id);
+        const color = document.getElementById(`col-${id}`).value;
+        const price = Math.round(p.weight * GRAM_PRICE);
+        const key = `${id}-${color}`;
+        if (cart[key]) cart[key].qty++; else cart[key] = { name: p.name, color: color, price: price, qty: 1 };
+        tg.HapticFeedback.impactOccurred('light');
+        updateUI();
+    }
+
+    function updateUI() {
+        let sum = 0, count = 0;
+        for (let k in cart) { sum += cart[k].price * cart[k].qty; count += cart[k].qty; }
+        document.getElementById('total').innerText = sum;
+        document.getElementById('cartBar').style.display = count > 0 ? 'flex' : 'none';
+    }
+
+    function openModal() {
+        let s = "";
+        for (let k in cart) { s += `• ${cart[k].name} (${cart[k].color}) x${cart[k].qty}\n`; }
+        document.getElementById('orderSummary').innerText = s;
+        document.getElementById('orderModal').style.display = 'flex';
+    }
+    function closeModal() { document.getElementById('orderModal').style.display = 'none'; }
+
+    function processPayment() {
+        const n = document.getElementById('name').value;
+        const p = document.getElementById('phone').value;
+        const a = document.getElementById('address').value;
+        if(!n || !p || !a) return alert("Заполните данные!");
+
+        // ЗАМЕНИ НА СВОЮ ССЫЛКУ МОНОБАНКА ИЛИ КАРТУ
+        const payLink = "https://send.monobank.ua/ваша_ссылка"; 
+        
+        let txt = "";
+        for (let k in cart) { txt += `• ${cart[k].name} (${cart[k].color}) x${cart[k].qty}\n`; }
+
+        const data = {
+            order: txt,
+            total: document.getElementById('total').innerText,
+            client: `👤 ${n}\n📞 ${p}\n📍 ${a}`
+        };
+
+        window.open(payLink, '_blank');
+        tg.sendData(JSON.stringify(data));
+        tg.close();
+    }
+    init();
+</script>
 </body>
 </html>
