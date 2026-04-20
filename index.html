@@ -5,151 +5,38 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        :root { --main: #0088cc; --bg: #121212; --card: #1e1e1e; }
-        body { font-family: sans-serif; background: var(--bg); color: white; margin: 0; padding-bottom: 30px; }
-        .header { padding: 15px; text-align: center; background: var(--card); border-bottom: 1px solid #333; position: sticky; top: 0; z-index: 10; }
-        .categories { display: flex; gap: 10px; overflow-x: auto; padding: 10px; background: #1a1a1a; scrollbar-width: none; }
-        .cat-btn { background: #333; color: #ccc; border: none; padding: 8px 15px; border-radius: 20px; white-space: nowrap; cursor: pointer; }
-        .cat-btn.active { background: var(--main); color: white; }
-        #catalog { padding: 10px; }
-        .card { background: var(--card); border-radius: 15px; padding: 15px; margin-bottom: 15px; border: 1px solid #333; }
-        .card img { width: 100%; border-radius: 10px; margin-bottom: 10px; object-fit: cover; max-height: 200px; }
-        .price-tag { color: #00d2ff; font-size: 1.3em; font-weight: bold; margin-bottom: 10px; }
-        label { font-size: 0.8em; color: #888; display: block; margin-bottom: 5px; }
-        select, input { background: #2a2a2a; color: white; border: 1px solid #444; padding: 12px; width: 100%; border-radius: 10px; margin-bottom: 10px; box-sizing: border-box; }
-        .btn { background: var(--main); color: white; border: none; padding: 15px; width: 100%; border-radius: 10px; font-weight: bold; cursor: pointer; }
-        .pay-grid { display: flex; gap: 10px; margin-bottom: 15px; }
-        .pay-grid label { flex: 1; background: #222; padding: 12px; border-radius: 10px; text-align: center; border: 1px solid #444; cursor: pointer; }
-        .pay-grid input { display: none; }
-        .pay-grid input:checked + span { color: var(--main); font-weight: bold; }
+        body { font-family: sans-serif; background: #121212; color: white; padding: 15px; margin: 0; }
+        .card { background: #1e1e1e; border-radius: 12px; padding: 15px; border: 1px solid #333; margin-bottom: 15px; }
+        input, select { background: #2a2a2a; color: white; border: 1px solid #444; padding: 12px; width: 100%; border-radius: 10px; margin-bottom: 10px; box-sizing: border-box; }
+        .btn { background: #0088cc; color: white; border: none; padding: 15px; width: 100%; border-radius: 10px; font-weight: bold; cursor: pointer; }
     </style>
 </head>
 <body>
-    <div class="header">📋 UA 3D PLUS</div>
-    <div class="categories" id="cat-list"></div>
-    <div id="catalog">Загрузка товаров...</div>
+    <div class="card">
+        <h3>Оформление заказа</h3>
+        <input type="text" id="name" placeholder="ФИО получателя">
+        <input type="text" id="phone" placeholder="Телефон">
+        <input type="text" id="addr" placeholder="Город и № почты">
+        <select id="method">
+            <option value="Карта (Mono)">💳 Карта (Mono)</option>
+            <option value="Наложенный платеж">📦 Почта</option>
+        </select>
+        <button class="btn" onclick="sendOrder()">✅ ПОДТВЕРДИТЬ</button>
+    </div>
 
     <script>
         let tg = window.Telegram.WebApp;
         tg.expand();
-
-        const CSV_URL = 'https://docs.google.com/spreadsheets/d/1gpBN2dsJNMgDWPSNoBwdeDbYM9PhH-1HiLyoh/pub?output=csv';
-        let allProducts = [];
-        let currentCat = 'Все';
-        let discount = 1;
-
-        async function loadData() {
-            try {
-                const res = await fetch(CSV_URL + '&cache=' + Date.now());
-                const text = await res.text();
-                const rows = text.split('\n').slice(1);
-                
-                allProducts = rows.map(r => {
-                    const c = r.split(',').map(v => v.trim().replace(/^"|"$/g, ''));
-                    return { 
-                        name: c[0], 
-                        cat: c[1] || 'Разное', 
-                        weight: parseFloat(c[2]) || 0, 
-                        img: c[3],
-                        colors: c[5] ? c[5].split(';') : ['Черный']
-                    };
-                }).filter(p => p.name);
-
-                renderCategories();
-                renderProducts();
-            } catch (e) { document.getElementById('catalog').innerText = 'Ошибка загрузки данных'; }
-        }
-
-        function renderCategories() {
-            const cats = ['Все', ...new Set(allProducts.map(p => p.cat))];
-            document.getElementById('cat-list').innerHTML = cats.map(c => 
-                `<button class="cat-btn ${currentCat === c ? 'active' : ''}" onclick="filter('${c}')">${c}</button>`
-            ).join('');
-        }
-
-        function filter(c) {
-            currentCat = c;
-            renderCategories();
-            renderProducts();
-        }
-
-        function calculatePrice(weight, infill) {
-            const baseGramPrice = 6; 
-            let multiplier = 1 + (infill - 20) / 100; 
-            return Math.round(weight * baseGramPrice * multiplier * discount);
-        }
-
-        function updateCardPrice(name, weight) {
-            const infill = document.getElementById(`infill-${name}`).value;
-            document.getElementById(`price-${name}`).innerText = calculatePrice(weight, infill);
-        }
-
-        function applyGlobalPromo() {
-            const code = document.getElementById('global-promo').value.toUpperCase();
-            discount = (code === "VETERAN") ? 0.9 : 1;
-            renderProducts();
-        }
-
-        function renderProducts() {
-            const filtered = currentCat === 'Все' ? allProducts : allProducts.filter(p => p.cat === currentCat);
-            let html = `<div class="card"><input type="text" id="global-promo" placeholder="Промокод на весь заказ" oninput="applyGlobalPromo()"></div>`;
-            
-            html += filtered.map(p => `
-                <div class="card">
-                    <img src="${p.img}" onerror="this.style.display='none'">
-                    <h3>${p.name}</h3>
-                    <div class="price-tag"><span id="price-${p.name}">${calculatePrice(p.weight, 40)}</span> грн</div>
-                    
-                    <label>Цвет детали:</label>
-                    <select id="color-${p.name}">${p.colors.map(c => `<option>${c}</option>`).join('')}</select>
-                    
-                    <label>Плотность (Infill):</label>
-                    <select id="infill-${p.name}" onchange="updateCardPrice('${p.name}', ${p.weight})">
-                        <option value="20">20% (Декор)</option>
-                        <option value="40" selected>40% (Стандарт)</option>
-                        <option value="80">80% (Прочная)</option>
-                        <option value="100">100% (Монолит)</option>
-                    </select>
-
-                    <label>Данные для отправки:</label>
-                    <input type="text" id="name-${p.name}" placeholder="ФИО получателя">
-                    <input type="text" id="phone-${p.name}" placeholder="Телефон">
-                    <input type="text" id="addr-${p.name}" placeholder="Город и № Новой Почты">
-                    
-                    <label>Способ оплаты:</label>
-                    <div class="pay-grid">
-                        <label><input type="radio" name="pay-${p.name}" value="Карта (Mono)" checked><span>💳 Карта</span></label>
-                        <label><input type="radio" name="pay-${p.name}" value="Наложенный платеж"><span>📦 Почта</span></label>
-                    </div>
-                    
-                    <button class="btn" onclick="order('${p.name}', ${p.weight})">🛒 ЗАКАЗАТЬ</button>
-                </div>
-            `).join('');
-            document.getElementById('catalog').innerHTML = html;
-        }
-
-        function order(prodName, weight) {
-            const infill = document.getElementById(`infill-${prodName}`).value;
-            const color = document.getElementById(`color-${prodName}`).value;
-            const method = document.querySelector(`input[name="pay-${prodName}"]:checked`).value;
-            const name = document.getElementById(`name-${prodName}`).value;
-            const phone = document.getElementById(`phone-${prodName}`).value;
-
-            if(!name || !phone) return alert("Заполните ФИО и телефон!");
-
-            const orderData = {
-                order: `${prodName} (Цвет: ${color}, Плотность: ${infill}%)`,
-                total: document.getElementById(`price-${prodName}`).innerText,
-                method: method,
-                client: `ФИО: ${name}\nТел: ${phone}\nДоставка: ${document.getElementById(`addr-${prodName}`).value}`
+        function sendOrder() {
+            const data = {
+                order: "3D Деталь (UA 3D PLUS)",
+                total: "450",
+                method: document.getElementById('method').value,
+                client: `ФИО: ${document.getElementById('name').value}\nТел: ${document.getElementById('phone').value}\nАдрес: ${document.getElementById('addr').value}`
             };
-
-            if(method === "Карта (Mono)") tg.openLink("https://bank.gov.ua/qr/QkNECjAwMgoxClVDVAoK0KjQuNGC0LDRlNCyINCg0YPRgdC70LDQvSDQktC-0LvQvtC00LjQvNC40YDQvtCy0LjRhwpVQTgzMzIyMDAxMDAwMDAyNjIwNTMwMDA0NTAyNgoKMzAxNjcwODM3MAoKCtCf0L7Qv9C-0LLQvdC10L3QvdGPINGA0LDRhdGD0L3QutGDCgo=");
-            tg.sendData(JSON.stringify(orderData));
+            tg.sendData(JSON.stringify(data));
             tg.close();
         }
-
-        loadData();
     </script>
 </body>
 </html>
