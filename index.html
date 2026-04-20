@@ -3,136 +3,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>UA 3D PLUS Shop</title>
+    <title>UA 3D PLUS</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        :root { --main: #0088cc; --bg: #121212; --card: #1e1e1e; }
-        body { font-family: sans-serif; background: var(--bg); color: white; margin: 0; padding-bottom: 90px; }
-        .header { padding: 15px; text-align: center; background: var(--card); border-bottom: 1px solid #333; }
-        .categories { display: flex; overflow-x: auto; gap: 8px; padding: 10px; position: sticky; top: 0; background: var(--bg); z-index: 10; }
-        .cat-btn { background: #2a2a2a; color: #bbb; border: 1px solid #444; padding: 8px 15px; border-radius: 20px; white-space: nowrap; border: none; cursor: pointer; }
-        .cat-btn.active { background: var(--main); color: white; }
-        #catalog { padding: 10px; display: grid; gap: 15px; }
-        .card { background: var(--card); border-radius: 15px; padding: 12px; border: 1px solid #333; }
-        .card img { width: 100%; border-radius: 10px; object-fit: cover; max-height: 200px; display: none; }
-        .price { color: #00d2ff; font-size: 1.3em; font-weight: bold; margin: 10px 0; }
-        select, input { background: #2a2a2a; color: white; border: 1px solid #444; padding: 10px; border-radius: 8px; width: 100%; margin-bottom: 10px; box-sizing: border-box; }
-        .controls { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-        .qty-btn { background: #333; border: 1px solid #444; color: white; width: 35px; height: 35px; border-radius: 10px; border: none; font-size: 1.2em; }
-        .add-btn { background: var(--main); color: white; border: none; padding: 10px; border-radius: 10px; flex-grow: 1; font-weight: bold; }
-        #deliveryForm { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 200; padding: 20px; box-sizing: border-box; flex-direction: column; justify-content: center; }
-        .cart-bar { position: fixed; bottom: 0; left: 0; right: 0; background: var(--card); padding: 15px; border-top: 1px solid #333; display: none; justify-content: space-between; align-items: center; z-index: 100; }
-        .checkout-btn { background: #28a745; color: white; border: none; padding: 10px 20px; border-radius: 10px; font-weight: bold; }
+        :root { --main-color: #0088cc; --bg-color: #121212; --card-bg: #1e1e1e; }
+        body { font-family: sans-serif; background: var(--bg-color); color: white; margin: 0; padding: 20px; }
+        .card { background: var(--card-bg); border-radius: 15px; padding: 15px; border: 1px solid #333; margin-bottom: 15px; }
+        .price { color: #00d2ff; font-weight: bold; font-size: 1.2em; }
+        .btn { background: var(--main-color); color: white; border: none; padding: 10px; width: 100%; border-radius: 10px; font-weight: bold; cursor: pointer; }
     </style>
 </head>
 <body>
-    <div class="header"><h2>UA 3D PLUS</h2></div>
-    <div class="categories" id="categories"><button class="cat-btn active" onclick="filterCat('Все')">Все</button></div>
-    <div id="catalog">Загрузка...</div>
-
-    <div id="deliveryForm">
-        <h3 style="text-align:center">Данные для доставки</h3>
-        <input type="text" id="clientName" placeholder="ФИО получателя">
-        <input type="text" id="clientPhone" placeholder="Номер телефона">
-        <input type="text" id="clientCity" placeholder="Город и № отделения НП">
-        <button class="checkout-btn" style="width:100%; margin-top:10px;" onclick="finalSend()">Подтвердить заказ</button>
-        <button class="cat-btn" style="width:100%; margin-top:10px;" onclick="closeForm()">Назад</button>
+    <div class="card">
+        <h2>UA 3D PLUS</h2>
+        <p>Каталог загружается...</p>
+        <button class="btn" onclick="tg.close()">Закрыть</button>
     </div>
-    
-    <div class="cart-bar" id="cartBar">
-        <div>Итого: <span id="totalPrice">0</span> грн</div>
-        <button class="checkout-btn" onclick="openForm()">Оформить</button>
-    </div>
-
-<script>
-    let tg = window.Telegram.WebApp;
-    tg.expand();
-
-    const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQp8hJG9TmZSxSbCNLWPuoDwqurKPHA2JwL7B3kJJ5gpBN2dsJNMgDWPSnoBwdeDbYM9PhH-1HiLyoh/pub?output=csv'; 
-    const PRICE_PER_GRAM = 6;
-    let allProducts = [];
-    let cart = {};
-
-    async function loadCatalog() {
-        try {
-            const response = await fetch(CSV_URL + '&cache=' + new Date().getTime());
-            const data = await response.text();
-            const rows = data.split('\n').filter(row => row.trim() !== '' && !row.includes('{')).slice(1);
-            const cats = new Set();
-            allProducts = rows.map((row, index) => {
-                const col = row.split(',').map(c => c.trim().replace(/^"|"$/g, ''));
-                if (col.length < 3) return null;
-                return { id: index, name: col[0], desc: col[1], weight: parseFloat(col[2]), photo: col[3], cat: col[4] || 'Разное', colors: col[5] ? col[5].split(';') : ['Черный'] };
-            }).filter(p => p && !isNaN(p.weight));
-            allProducts.forEach(p => cats.add(p.cat));
-            cats.forEach(c => { document.getElementById('categories').innerHTML += `<button class="cat-btn" onclick="filterCat('${c}')">${c}</button>`; });
-            renderProducts('Все');
-        } catch (e) { document.getElementById('catalog').innerText = 'Ошибка загрузки'; }
-    }
-
-    function renderProducts(category) {
-        let html = '';
-        const filtered = category === 'Все' ? allProducts : allProducts.filter(p => p.cat === category);
-        filtered.forEach(p => {
-            const price = Math.round(p.weight * PRICE_PER_GRAM);
-            const qty = cart[p.id] ? cart[p.id].qty : 0;
-            let options = p.colors.map(c => `<option value="${c}">${c}</option>`).join('');
-            html += `<div class="card">
-                ${p.photo ? `<img src="${p.photo}" style="display:block;" onerror="this.style.display='none'">` : ''}
-                <h3>${p.name}</h3><p>${p.desc}</p><div class="price">${price} грн</div>
-                <select id="color-${p.id}" ${qty > 0 ? 'disabled' : ''}>${options}</select>
-                <div class="controls">
-                    ${qty > 0 ? `<button class="qty-btn" onclick="updateCart(${p.id}, -1)">-</button><span>${qty} шт</span><button class="qty-btn" onclick="updateCart(${p.id}, 1)">+</button>` 
-                    : `<button class="add-btn" onclick="updateCart(${p.id}, 1)">В корзину</button>`}
-                </div></div>`;
-        });
-        document.getElementById('catalog').innerHTML = html;
-    }
-
-    function updateCart(id, delta) {
-        const p = allProducts.find(item => item.id === id);
-        const color = document.getElementById(`color-${id}`).value;
-        if (!cart[id]) cart[id] = { name: p.name, price: Math.round(p.weight * PRICE_PER_GRAM), qty: 0, color: color };
-        cart[id].qty += delta;
-        if (cart[id].qty <= 0) delete cart[id];
-        updateUI();
-    }
-
-    function updateUI() {
-        let total = 0, count = 0;
-        for (let id in cart) { total += cart[id].price * cart[id].qty; count += cart[id].qty; }
-        document.getElementById('totalPrice').innerText = total;
-        document.getElementById('cartBar').style.display = count > 0 ? 'flex' : 'none';
-        renderProducts(document.querySelector('.cat-btn.active').innerText);
-    }
-
-    function filterCat(cat) {
-        document.querySelectorAll('.cat-btn').forEach(b => b.classList.toggle('active', b.innerText === cat));
-        renderProducts(cat);
-    }
-
-    function openForm() { document.getElementById('deliveryForm').style.display = 'flex'; }
-    function closeForm() { document.getElementById('deliveryForm').style.display = 'none'; }
-
-    function finalSend() {
-        const name = document.getElementById('clientName').value;
-        const phone = document.getElementById('clientPhone').value;
-        const city = document.getElementById('clientCity').value;
-        if (!name || !phone || !city) { alert('Заполните данные для доставки!'); return; }
-
-        let orderItems = "";
-        for (let id in cart) { orderItems += `• ${cart[id].name} [${cart[id].color}] — ${cart[id].qty} шт.\n`; }
-        
-        const result = {
-            order: orderItems,
-            total: document.getElementById('totalPrice').innerText,
-            client: `ФИО: ${name}\nТел: ${phone}\nАдрес: ${city}`
-        };
-
-        tg.sendData(JSON.stringify(result));
-        tg.close();
-    }
-    loadCatalog();
-</script>
+    <script>
+        let tg = window.Telegram.WebApp;
+        tg.expand();
+    </script>
 </body>
 </html>
