@@ -1,205 +1,155 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>UA 3D PLUS Shop</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        :root { --main: #0088cc; --bg: #121212; --card: #1e1e1e; --success: #28a745; --text: #ffffff; }
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding-bottom: 100px; -webkit-tap-highlight-color: transparent; }
+        :root { --main: #0088cc; --bg: #121212; --card: #1e1e1e; }
+        body { font-family: sans-serif; background: var(--bg); color: white; margin: 0; padding-bottom: 30px; }
         .header { padding: 15px; text-align: center; background: var(--card); border-bottom: 1px solid #333; position: sticky; top: 0; z-index: 10; }
-        #catalog { padding: 10px; display: grid; gap: 15px; }
-        .card { background: var(--card); border-radius: 15px; padding: 15px; border: 1px solid #333; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
-        .card img { width: 100%; border-radius: 10px; object-fit: cover; max-height: 220px; margin-bottom: 12px; display: block; }
-        .price { color: #00d2ff; font-size: 1.4em; font-weight: bold; margin: 8px 0; }
-        label { font-size: 0.75em; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; display: block; }
-        select, input { background: #2a2a2a; color: white; border: 1px solid #444; padding: 12px; border-radius: 10px; width: 100%; margin-bottom: 12px; box-sizing: border-box; font-size: 14px; }
-        
-        .qty-controls { display: flex; align-items: center; justify-content: space-between; background: #262626; padding: 5px; border-radius: 12px; margin-top: 10px; }
-        .qty-btn { background: var(--main); border: none; color: white; width: 35px; height: 35px; border-radius: 8px; font-size: 20px; font-weight: bold; cursor: pointer; }
-        .add-btn { background: var(--main); color: white; border: none; padding: 14px; border-radius: 12px; width: 100%; font-weight: bold; font-size: 15px; cursor: pointer; transition: 0.2s; }
-        .add-btn:active { transform: scale(0.98); opacity: 0.9; }
-
-        #orderModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg); z-index: 200; padding: 20px; box-sizing: border-box; flex-direction: column; overflow-y: auto; }
-        .pay-methods { display: flex; gap: 10px; margin: 10px 0 20px 0; }
-        .pay-methods label { flex: 1; background: #222; border: 1px solid #444; padding: 12px; border-radius: 10px; cursor: pointer; text-align: center; color: #fff; }
-        .pay-methods input { display: none; }
-        .pay-methods input:checked + span { color: var(--main); font-weight: bold; }
-        .pay-methods label:has(input:checked) { border-color: var(--main); background: #1a2a35; }
-
-        .cart-bar { position: fixed; bottom: 0; left: 0; right: 0; background: #1c1c1c; padding: 15px 20px; border-top: 1px solid #333; display: none; justify-content: space-between; align-items: center; z-index: 100; box-shadow: 0 -5px 15px rgba(0,0,0,0.5); }
+        .categories { display: flex; gap: 10px; overflow-x: auto; padding: 10px; background: #1a1a1a; scrollbar-width: none; }
+        .cat-btn { background: #333; color: #ccc; border: none; padding: 8px 15px; border-radius: 20px; white-space: nowrap; cursor: pointer; }
+        .cat-btn.active { background: var(--main); color: white; }
+        #catalog { padding: 10px; }
+        .card { background: var(--card); border-radius: 15px; padding: 15px; margin-bottom: 15px; border: 1px solid #333; }
+        .card img { width: 100%; border-radius: 10px; margin-bottom: 10px; object-fit: cover; max-height: 200px; }
+        .price-tag { color: #00d2ff; font-size: 1.3em; font-weight: bold; margin-bottom: 10px; }
+        label { font-size: 0.8em; color: #888; display: block; margin-bottom: 5px; }
+        select, input { background: #2a2a2a; color: white; border: 1px solid #444; padding: 12px; width: 100%; border-radius: 10px; margin-bottom: 10px; box-sizing: border-box; }
+        .btn { background: var(--main); color: white; border: none; padding: 15px; width: 100%; border-radius: 10px; font-weight: bold; cursor: pointer; }
+        .pay-grid { display: flex; gap: 10px; margin-bottom: 15px; }
+        .pay-grid label { flex: 1; background: #222; padding: 12px; border-radius: 10px; text-align: center; border: 1px solid #444; cursor: pointer; }
+        .pay-grid input { display: none; }
+        .pay-grid input:checked + span { color: var(--main); font-weight: bold; }
     </style>
 </head>
 <body>
-    <div class="header"><h2>UA 3D PLUS</h2></div>
-    <div id="catalog">Синхронизация с принтерами...</div>
+    <div class="header">📋 UA 3D PLUS</div>
+    <div class="categories" id="cat-list"></div>
+    <div id="catalog">Загрузка товаров...</div>
 
-    <div id="orderModal">
-        <h3 style="text-align:center">Оформление заказа</h3>
-        <div id="summary" style="font-size: 0.9em; color: #bbb; background: #1a1a1a; padding: 15px; border-radius: 12px; margin-bottom: 15px; line-height: 1.5;"></div>
-        
-        <input type="text" id="name" placeholder="ФИО получателя">
-        <input type="text" id="phone" placeholder="Номер телефона">
-        <input type="text" id="address" placeholder="Город и № Новой Почты">
-        <input type="text" id="promo" placeholder="Промокод (если есть)" oninput="applyPromo()">
-        
-        <label>СПОСОБ ОПЛАТЫ:</label>
-        <div class="pay-methods">
-            <label><input type="radio" name="pay_method" value="Предоплата (Mono)" checked><span>💳 Карта</span></label>
-            <label><input type="radio" name="pay_method" value="Наложенный платеж"><span>📦 При получении</span></label>
-        </div>
+    <script>
+        let tg = window.Telegram.WebApp;
+        tg.expand();
 
-        <div style="text-align: right; margin-bottom: 20px; font-weight: bold; font-size: 1.3em;">
-            Итого: <span id="finalTotal">0</span> грн
-        </div>
+        const CSV_URL = 'https://docs.google.com/spreadsheets/d/1gpBN2dsJNMgDWPSNoBwdeDbYM9PhH-1HiLyoh/pub?output=csv';
+        let allProducts = [];
+        let currentCat = 'Все';
+        let discount = 1;
 
-        <button class="add-btn" style="background:var(--success)" onclick="processOrder()">✅ ПОДТВЕРДИТЬ ЗАКАЗ</button>
-        <button onclick="closeModal()" style="background:none; color:#888; border:none; margin-top:15px; width:100%; font-size: 14px;">Вернуться в каталог</button>
-    </div>
-    
-    <div class="cart-bar" id="cartBar">
-        <div style="font-size: 1.1em;">Сумма: <span id="totalDisplay" style="font-weight:bold; color:#00d2ff;">0</span> <small>грн</small></div>
-        <button class="add-btn" style="width:auto; padding: 10px 25px;" onclick="openModal()">Оформить</button>
-    </div>
-
-<script>
-    let tg = window.Telegram.WebApp;
-    tg.expand();
-
-    const CSV_URL = 'https://docs.google.com/spreadsheets/d/1gpBN2dsJNMgDWPSNoBwdeDbYM9PhH-1HiLyoh/pub?output=csv';
-    const BASE_GRAM_PRICE = 6; 
-    let products = [];
-    let cart = {};
-    let discount = 1;
-
-    async function load() {
-        try {
-            const res = await fetch(CSV_URL + '&cache=' + Date.now());
-            const text = await res.text();
-            const rows = text.split('\n').slice(1);
-            products = rows.map((r, i) => {
-                const c = r.split(',').map(v => v.trim().replace(/^"|"$/g, ''));
-                if (c.length < 3) return null;
-                return { id: i, name: c[0], weight: parseFloat(c[2]), img: c[3], colors: c[5] ? c[5].split(';') : ['Черный'] };
-            }).filter(p => p);
-            render();
-        } catch (e) { document.getElementById('catalog').innerText = 'Ошибка соединения с базой'; }
-    }
-
-    function calculatePrice(weight, infill) {
-        let multiplier = 1 + (infill - 20) / 100; 
-        return Math.round(weight * BASE_GRAM_PRICE * multiplier);
-    }
-
-    function render() {
-        let html = '';
-        products.forEach(p => {
-            const count = cart[p.id] ? cart[p.id].qty : 0;
-            const infill = cart[p.id] ? cart[p.id].infill : 40;
-            const price = calculatePrice(p.weight, infill);
-            html += `<div class="card">
-                <img src="${p.img}" onerror="this.style.display='none'">
-                <h3>${p.name}</h3>
-                <div class="price">${price} грн</div>
+        async function loadData() {
+            try {
+                const res = await fetch(CSV_URL + '&cache=' + Date.now());
+                const text = await res.text();
+                const rows = text.split('\n').slice(1);
                 
-                <label>Цвет:</label>
-                <select id="color-${p.id}" onchange="updateItem(${p.id})">${p.colors.map(c => `<option>${c}</option>`).join('')}</select>
-                
-                <label>Плотность (Infill):</label>
-                <select id="infill-${p.id}" onchange="updateItem(${p.id})">
-                    <option value="15">15% (Декоративная)</option>
-                    <option value="40" selected>40% (Стандарт)</option>
-                    <option value="80">80% (Усиленная)</option>
-                    <option value="100">100% (Макс. прочность)</option>
-                </select>
+                allProducts = rows.map(r => {
+                    const c = r.split(',').map(v => v.trim().replace(/^"|"$/g, ''));
+                    return { 
+                        name: c[0], 
+                        cat: c[1] || 'Разное', 
+                        weight: parseFloat(c[2]) || 0, 
+                        img: c[3],
+                        colors: c[5] ? c[5].split(';') : ['Черный']
+                    };
+                }).filter(p => p.name);
 
-                <div class="qty-controls">
-                    ${count > 0 ? `
-                        <button class="qty-btn" onclick="changeQty(${p.id}, -1)">-</button>
-                        <span style="font-weight:bold">${count} шт</span>
-                        <button class="qty-btn" onclick="changeQty(${p.id}, 1)">+</button>
-                    ` : `
-                        <button class="add-btn" onclick="changeQty(${p.id}, 1)">Добавить в корзину</button>
-                    `}
+                renderCategories();
+                renderProducts();
+            } catch (e) { document.getElementById('catalog').innerText = 'Ошибка загрузки данных'; }
+        }
+
+        function renderCategories() {
+            const cats = ['Все', ...new Set(allProducts.map(p => p.cat))];
+            document.getElementById('cat-list').innerHTML = cats.map(c => 
+                `<button class="cat-btn ${currentCat === c ? 'active' : ''}" onclick="filter('${c}')">${c}</button>`
+            ).join('');
+        }
+
+        function filter(c) {
+            currentCat = c;
+            renderCategories();
+            renderProducts();
+        }
+
+        function calculatePrice(weight, infill) {
+            const baseGramPrice = 6; 
+            let multiplier = 1 + (infill - 20) / 100; 
+            return Math.round(weight * baseGramPrice * multiplier * discount);
+        }
+
+        function updateCardPrice(name, weight) {
+            const infill = document.getElementById(`infill-${name}`).value;
+            document.getElementById(`price-${name}`).innerText = calculatePrice(weight, infill);
+        }
+
+        function applyGlobalPromo() {
+            const code = document.getElementById('global-promo').value.toUpperCase();
+            discount = (code === "VETERAN") ? 0.9 : 1;
+            renderProducts();
+        }
+
+        function renderProducts() {
+            const filtered = currentCat === 'Все' ? allProducts : allProducts.filter(p => p.cat === currentCat);
+            let html = `<div class="card"><input type="text" id="global-promo" placeholder="Промокод на весь заказ" oninput="applyGlobalPromo()"></div>`;
+            
+            html += filtered.map(p => `
+                <div class="card">
+                    <img src="${p.img}" onerror="this.style.display='none'">
+                    <h3>${p.name}</h3>
+                    <div class="price-tag"><span id="price-${p.name}">${calculatePrice(p.weight, 40)}</span> грн</div>
+                    
+                    <label>Цвет детали:</label>
+                    <select id="color-${p.name}">${p.colors.map(c => `<option>${c}</option>`).join('')}</select>
+                    
+                    <label>Плотность (Infill):</label>
+                    <select id="infill-${p.name}" onchange="updateCardPrice('${p.name}', ${p.weight})">
+                        <option value="20">20% (Декор)</option>
+                        <option value="40" selected>40% (Стандарт)</option>
+                        <option value="80">80% (Прочная)</option>
+                        <option value="100">100% (Монолит)</option>
+                    </select>
+
+                    <label>Данные для отправки:</label>
+                    <input type="text" id="name-${p.name}" placeholder="ФИО получателя">
+                    <input type="text" id="phone-${p.name}" placeholder="Телефон">
+                    <input type="text" id="addr-${p.name}" placeholder="Город и № Новой Почты">
+                    
+                    <label>Способ оплаты:</label>
+                    <div class="pay-grid">
+                        <label><input type="radio" name="pay-${p.name}" value="Карта (Mono)" checked><span>💳 Карта</span></label>
+                        <label><input type="radio" name="pay-${p.name}" value="Наложенный платеж"><span>📦 Почта</span></label>
+                    </div>
+                    
+                    <button class="btn" onclick="order('${p.name}', ${p.weight})">🛒 ЗАКАЗАТЬ</button>
                 </div>
-            </div>`;
-        });
-        document.getElementById('catalog').innerHTML = html;
-    }
-
-    function updateItem(id) {
-        if (cart[id]) {
-            cart[id].color = document.getElementById(`color-${id}`).value;
-            cart[id].infill = document.getElementById(`infill-${id}`).value;
-            cart[id].price = calculatePrice(products.find(x => x.id === id).weight, cart[id].infill);
-            updateCart();
-            render();
+            `).join('');
+            document.getElementById('catalog').innerHTML = html;
         }
-    }
 
-    function changeQty(id, delta) {
-        const p = products.find(x => x.id === id);
-        if (!cart[id]) {
-            cart[id] = { 
-                name: p.name, qty: 0, 
-                price: calculatePrice(p.weight, document.getElementById(`infill-${id}`).value), 
-                color: document.getElementById(`color-${id}`).value,
-                infill: document.getElementById(`infill-${id}`).value 
+        function order(prodName, weight) {
+            const infill = document.getElementById(`infill-${prodName}`).value;
+            const color = document.getElementById(`color-${prodName}`).value;
+            const method = document.querySelector(`input[name="pay-${prodName}"]:checked`).value;
+            const name = document.getElementById(`name-${prodName}`).value;
+            const phone = document.getElementById(`phone-${prodName}`).value;
+
+            if(!name || !phone) return alert("Заполните ФИО и телефон!");
+
+            const orderData = {
+                order: `${prodName} (Цвет: ${color}, Плотность: ${infill}%)`,
+                total: document.getElementById(`price-${prodName}`).innerText,
+                method: method,
+                client: `ФИО: ${name}\nТел: ${phone}\nДоставка: ${document.getElementById(`addr-${prodName}`).value}`
             };
+
+            if(method === "Карта (Mono)") tg.openLink("https://bank.gov.ua/qr/QkNECjAwMgoxClVDVAoK0KjQuNGC0LDRlNCyINCg0YPRgdC70LDQvSDQktC-0LvQvtC00LjQvNC40YDQvtCy0LjRhwpVQTgzMzIyMDAxMDAwMDAyNjIwNTMwMDA0NTAyNgoKMzAxNjcwODM3MAoKCtCf0L7Qv9C-0LLQvdC10L3QvdGPINGA0LDRhdGD0L3QutGDCgo=");
+            tg.sendData(JSON.stringify(orderData));
+            tg.close();
         }
-        cart[id].qty += delta;
-        if (cart[id].qty <= 0) delete cart[id];
-        updateCart();
-        render();
-    }
 
-    function updateCart() {
-        let total = 0, hasItems = false;
-        for (let id in cart) { total += cart[id].price * cart[id].qty; hasItems = true; }
-        document.getElementById('totalDisplay').innerText = Math.round(total * discount);
-        document.getElementById('cartBar').style.display = hasItems ? 'flex' : 'none';
-    }
-
-    function applyPromo() {
-        const code = document.getElementById('promo').value.toUpperCase();
-        discount = (code === "VETERAN") ? 0.9 : 1; 
-        updateCart();
-        document.getElementById('finalTotal').innerText = document.getElementById('totalDisplay').innerText;
-    }
-
-    function openModal() {
-        let text = "";
-        for (let id in cart) { text += `• ${cart[id].name} (${cart[id].color}, ${cart[id].infill}%) x${cart[id].qty}\n`; }
-        document.getElementById('summary').innerText = text;
-        document.getElementById('finalTotal').innerText = document.getElementById('totalDisplay').innerText;
-        document.getElementById('orderModal').style.display = 'flex';
-    }
-
-    function closeModal() { document.getElementById('orderModal').style.display = 'none'; }
-
-    function processOrder() {
-        const name = document.getElementById('name').value;
-        const phone = document.getElementById('phone').value;
-        const method = document.querySelector('input[name="pay_method"]:checked').value;
-
-        if (!name || !phone) return alert("Пожалуйста, заполните ФИО и телефон");
-
-        const orderData = {
-            order: document.getElementById('summary').innerText,
-            total: document.getElementById('finalTotal').innerText,
-            method: method,
-            client: `ФИО: ${name}\nТел: ${phone}\nАдрес: ${document.getElementById('address').value}`
-        };
-
-        if (method === "Предоплата (Mono)") {
-            tg.openLink("https://bank.gov.ua/qr/QkNECjAwMgoxClVDVAoK0KjQuNGC0LDRlNCyINCg0YPRgdC70LDQvSDQktC-0LvQvtC00LjQvNC40YDQvtCy0LjRhwpVQTgzMzIyMDAxMDAwMDAyNjIwNTMwMDA0NTAyNgoKMzAxNjcwODM3MAoKCtCf0L7Qv9C-0LLQvdC10L3QvdGPINGA0LDRhdGD0L3QutGDCgo="); // ЗАМЕНИ НА СВОЮ
-        }
-        
-        tg.sendData(JSON.stringify(orderData));
-        tg.close();
-    }
-    load();
-</script>
+        loadData();
+    </script>
 </body>
 </html>
