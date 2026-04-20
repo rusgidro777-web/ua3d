@@ -10,7 +10,7 @@
         body { font-family: sans-serif; background: var(--bg); color: white; margin: 0; padding-bottom: 90px; }
         .header { padding: 15px; text-align: center; background: var(--card); border-bottom: 1px solid #333; }
         .categories { display: flex; overflow-x: auto; gap: 8px; padding: 10px; position: sticky; top: 0; background: var(--bg); z-index: 10; }
-        .cat-btn { background: #2a2a2a; color: #bbb; border: none; padding: 8px 15px; border-radius: 20px; white-space: nowrap; }
+        .cat-btn { background: #2a2a2a; color: #bbb; border: 1px solid #444; padding: 8px 15px; border-radius: 20px; white-space: nowrap; border: none; cursor: pointer; }
         .cat-btn.active { background: var(--main); color: white; }
         #catalog { padding: 10px; display: grid; gap: 15px; }
         .card { background: var(--card); border-radius: 15px; padding: 12px; border: 1px solid #333; }
@@ -18,7 +18,7 @@
         .price { color: #00d2ff; font-size: 1.3em; font-weight: bold; margin: 10px 0; }
         select, input { background: #2a2a2a; color: white; border: 1px solid #444; padding: 10px; border-radius: 8px; width: 100%; margin-bottom: 10px; box-sizing: border-box; }
         .controls { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-        .qty-btn { background: #333; border: 1px solid #444; color: white; width: 35px; height: 35px; border-radius: 10px; border: none; }
+        .qty-btn { background: #333; border: 1px solid #444; color: white; width: 35px; height: 35px; border-radius: 10px; border: none; font-size: 1.2em; }
         .add-btn { background: var(--main); color: white; border: none; padding: 10px; border-radius: 10px; flex-grow: 1; font-weight: bold; }
         #deliveryForm { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 200; padding: 20px; box-sizing: border-box; flex-direction: column; justify-content: center; }
         .cart-bar { position: fixed; bottom: 0; left: 0; right: 0; background: var(--card); padding: 15px; border-top: 1px solid #333; display: none; justify-content: space-between; align-items: center; z-index: 100; }
@@ -31,7 +31,7 @@
     <div id="catalog">Загрузка...</div>
 
     <div id="deliveryForm">
-        <h3>Данные для доставки</h3>
+        <h3 style="text-align:center">Данные для доставки</h3>
         <input type="text" id="clientName" placeholder="ФИО получателя">
         <input type="text" id="clientPhone" placeholder="Номер телефона">
         <input type="text" id="clientCity" placeholder="Город и № отделения НП">
@@ -67,7 +67,7 @@
             allProducts.forEach(p => cats.add(p.cat));
             cats.forEach(c => { document.getElementById('categories').innerHTML += `<button class="cat-btn" onclick="filterCat('${c}')">${c}</button>`; });
             renderProducts('Все');
-        } catch (e) { console.error(e); }
+        } catch (e) { document.getElementById('catalog').innerText = 'Ошибка загрузки'; }
     }
 
     function renderProducts(category) {
@@ -76,11 +76,11 @@
         filtered.forEach(p => {
             const price = Math.round(p.weight * PRICE_PER_GRAM);
             const qty = cart[p.id] ? cart[p.id].qty : 0;
-            let opts = p.colors.map(c => `<option value="${c}">${c}</option>`).join('');
+            let options = p.colors.map(c => `<option value="${c}">${c}</option>`).join('');
             html += `<div class="card">
                 ${p.photo ? `<img src="${p.photo}" style="display:block;" onerror="this.style.display='none'">` : ''}
                 <h3>${p.name}</h3><p>${p.desc}</p><div class="price">${price} грн</div>
-                <select id="color-${p.id}" ${qty > 0 ? 'disabled' : ''}>${opts}</select>
+                <select id="color-${p.id}" ${qty > 0 ? 'disabled' : ''}>${options}</select>
                 <div class="controls">
                     ${qty > 0 ? `<button class="qty-btn" onclick="updateCart(${p.id}, -1)">-</button><span>${qty} шт</span><button class="qty-btn" onclick="updateCart(${p.id}, 1)">+</button>` 
                     : `<button class="add-btn" onclick="updateCart(${p.id}, 1)">В корзину</button>`}
@@ -118,10 +118,18 @@
         const name = document.getElementById('clientName').value;
         const phone = document.getElementById('clientPhone').value;
         const city = document.getElementById('clientCity').value;
-        if (!name || !phone || !city) { alert('Заполните все данные!'); return; }
-        let list = "";
-        for (let id in cart) { list += `• ${cart[id].name} [${cart[id].color}] — ${cart[id].qty} шт.\n`; }
-        tg.sendData(JSON.stringify({ order: list, total: document.getElementById('totalPrice').innerText, client: `ФИО: ${name}\nТел: ${phone}\nАдрес: ${city}` }));
+        if (!name || !phone || !city) { alert('Заполните данные для доставки!'); return; }
+
+        let orderItems = "";
+        for (let id in cart) { orderItems += `• ${cart[id].name} [${cart[id].color}] — ${cart[id].qty} шт.\n`; }
+        
+        const result = {
+            order: orderItems,
+            total: document.getElementById('totalPrice').innerText,
+            client: `ФИО: ${name}\nТел: ${phone}\nАдрес: ${city}`
+        };
+
+        tg.sendData(JSON.stringify(result));
         tg.close();
     }
     loadCatalog();
