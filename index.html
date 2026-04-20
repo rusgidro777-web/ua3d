@@ -7,19 +7,20 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         :root { --main: #0088cc; --bg: #121212; --card: #1e1e1e; }
-        body { font-family: sans-serif; background: var(--bg); color: white; margin: 0; padding-bottom: 80px; }
+        body { font-family: sans-serif; background: var(--bg); color: white; margin: 0; padding-bottom: 90px; }
         .header { padding: 15px; text-align: center; background: var(--card); border-bottom: 1px solid #333; }
-        .categories { display: flex; overflow-x: auto; gap: 8px; padding: 10px; background: var(--bg); position: sticky; top: 0; z-index: 10; }
-        .cat-btn { background: #2a2a2a; color: #bbb; border: 1px solid #444; padding: 8px 15px; border-radius: 20px; white-space: nowrap; }
-        .cat-btn.active { background: var(--main); color: white; border-color: var(--main); }
+        .categories { display: flex; overflow-x: auto; gap: 8px; padding: 10px; position: sticky; top: 0; background: var(--bg); z-index: 10; }
+        .cat-btn { background: #2a2a2a; color: #bbb; border: 1px solid #444; padding: 8px 15px; border-radius: 20px; white-space: nowrap; border: none; cursor: pointer; }
+        .cat-btn.active { background: var(--main); color: white; }
         #catalog { padding: 10px; display: grid; gap: 15px; }
         .card { background: var(--card); border-radius: 15px; padding: 12px; border: 1px solid #333; }
         .card img { width: 100%; border-radius: 10px; object-fit: cover; max-height: 200px; display: none; }
-        .price { color: #00d2ff; font-size: 1.2em; font-weight: bold; margin: 10px 0; }
+        .price { color: #00d2ff; font-size: 1.3em; font-weight: bold; margin: 10px 0; }
+        select { background: #2a2a2a; color: white; border: 1px solid #444; padding: 8px; border-radius: 8px; width: 100%; margin-bottom: 10px; }
         .controls { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-        .qty-btn { background: #333; border: 1px solid #444; color: white; width: 35px; height: 35px; border-radius: 10px; }
+        .qty-btn { background: #333; border: 1px solid #444; color: white; width: 35px; height: 35px; border-radius: 10px; border: none; }
         .add-btn { background: var(--main); color: white; border: none; padding: 10px; border-radius: 10px; flex-grow: 1; font-weight: bold; }
-        .cart-bar { position: fixed; bottom: 0; left: 0; right: 0; background: var(--card); padding: 15px; border-top: 1px solid #333; display: none; justify-content: space-between; align-items: center; }
+        .cart-bar { position: fixed; bottom: 0; left: 0; right: 0; background: var(--card); padding: 15px; border-top: 1px solid #333; display: none; justify-content: space-between; align-items: center; z-index: 100; }
         .checkout-btn { background: #28a745; color: white; border: none; padding: 10px 20px; border-radius: 10px; font-weight: bold; }
     </style>
 </head>
@@ -29,14 +30,14 @@
     <div id="catalog">Загрузка...</div>
     <div class="cart-bar" id="cartBar">
         <div>Итого: <span id="totalPrice">0</span> грн</div>
-        <button class="checkout-btn" onclick="sendOrder()">Оформить заказ</button>
+        <button class="checkout-btn" onclick="sendOrder()">Заказать</button>
     </div>
 
 <script>
     let tg = window.Telegram.WebApp;
     tg.expand();
 
-    // ЗАМЕНИ НА СВОЮ ССЫЛКУ CSV
+    // ЗАМЕНИТЕ НА ВАШУ ССЫЛКУ CSV
     const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQp8hJG9TmZSxSbCNLWPuoDwqurKPHA2JwL7B3kJJ5gpBN2dsJNMgDWPSnoBwdeDbYM9PhH-1HiLyoh/pub?output=csv'; 
     const PRICE_PER_GRAM = 6;
     let allProducts = [];
@@ -50,13 +51,14 @@
             const cats = new Set();
             allProducts = rows.map((row, index) => {
                 const col = row.split(',').map(c => c.trim().replace(/^"|"$/g, ''));
-                const p = { id: index, name: col[0], desc: col[1], weight: parseFloat(col[2]), photo: col[3], cat: col[4] || 'Разное' };
+                if (col.length < 3) return null;
+                const p = { id: index, name: col[0], desc: col[1], weight: parseFloat(col[2]), photo: col[3], cat: col[4] || 'Разное', colors: col[5] ? col[5].split(';') : ['Черный'] };
                 if (p.cat) cats.add(p.cat);
                 return p;
-            }).filter(p => !isNaN(p.weight));
+            }).filter(p => p && !isNaN(p.weight));
             cats.forEach(c => { document.getElementById('categories').innerHTML += `<button class="cat-btn" onclick="filterCat('${c}')">${c}</button>`; });
             renderProducts('Все');
-        } catch (e) { console.error(e); }
+        } catch (e) { document.getElementById('catalog').innerText = 'Ошибка загрузки'; }
     }
 
     function renderProducts(category) {
@@ -65,9 +67,11 @@
         filtered.forEach(p => {
             const price = Math.round(p.weight * PRICE_PER_GRAM);
             const qty = cart[p.id] ? cart[p.id].qty : 0;
+            let options = p.colors.map(c => `<option value="${c}">${c}</option>`).join('');
             html += `<div class="card">
                 ${p.photo ? `<img src="${p.photo}" style="display:block;" onerror="this.style.display='none'">` : ''}
                 <h3>${p.name}</h3><p>${p.desc}</p><div class="price">${price} грн</div>
+                <select id="color-${p.id}" ${qty > 0 ? 'disabled' : ''}>${options}</select>
                 <div class="controls">
                     ${qty > 0 ? `<button class="qty-btn" onclick="updateCart(${p.id}, -1)">-</button><span>${qty} шт</span><button class="qty-btn" onclick="updateCart(${p.id}, 1)">+</button>` 
                     : `<button class="add-btn" onclick="updateCart(${p.id}, 1)">В корзину</button>`}
@@ -78,7 +82,8 @@
 
     function updateCart(id, delta) {
         const p = allProducts.find(item => item.id === id);
-        if (!cart[id]) cart[id] = { name: p.name, price: Math.round(p.weight * PRICE_PER_GRAM), qty: 0 };
+        const color = document.getElementById(`color-${id}`).value;
+        if (!cart[id]) cart[id] = { name: p.name, price: Math.round(p.weight * PRICE_PER_GRAM), qty: 0, color: color };
         cart[id].qty += delta;
         if (cart[id].qty <= 0) delete cart[id];
         updateUI();
@@ -99,7 +104,7 @@
 
     function sendOrder() {
         let message = "📦 НОВЫЙ ЗАКАЗ:\n";
-        for (let id in cart) { message += `• ${cart[id].name} — ${cart[id].qty} шт.\n`; }
+        for (let id in cart) { message += `• ${cart[id].name} [${cart[id].color}] — ${cart[id].qty} шт.\n`; }
         message += `\n💰 Итого: ${document.getElementById('totalPrice').innerText} грн`;
         tg.sendData(message);
         tg.close();
