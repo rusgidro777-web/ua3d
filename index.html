@@ -6,200 +6,110 @@
     <title>UA 3D PLUS Shop</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        :root { --main: #0088cc; --bg: #121212; --card: #1e1e1e; --success: #28a745; --text: #ffffff; }
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding-bottom: 100px; -webkit-tap-highlight-color: transparent; }
-        .header { padding: 15px; text-align: center; background: var(--card); border-bottom: 1px solid #333; position: sticky; top: 0; z-index: 10; }
+        :root { --main: #0088cc; --bg: #121212; --card: #1e1e1e; }
+        body { font-family: sans-serif; background: var(--bg); color: white; margin: 0; padding-bottom: 90px; }
+        .header { padding: 15px; text-align: center; background: var(--card); border-bottom: 1px solid #333; }
+        .categories { display: flex; overflow-x: auto; gap: 8px; padding: 10px; position: sticky; top: 0; background: var(--bg); z-index: 10; }
+        .cat-btn { background: #2a2a2a; color: #bbb; border: 1px solid #444; padding: 8px 15px; border-radius: 20px; white-space: nowrap; border: none; cursor: pointer; }
+        .cat-btn.active { background: var(--main); color: white; }
         #catalog { padding: 10px; display: grid; gap: 15px; }
-        .card { background: var(--card); border-radius: 15px; padding: 15px; border: 1px solid #333; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
-        .card img { width: 100%; border-radius: 10px; object-fit: cover; max-height: 220px; margin-bottom: 12px; display: block; }
-        .price { color: #00d2ff; font-size: 1.4em; font-weight: bold; margin: 8px 0; }
-        label { font-size: 0.75em; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; display: block; }
-        select, input { background: #2a2a2a; color: white; border: 1px solid #444; padding: 12px; border-radius: 10px; width: 100%; margin-bottom: 12px; box-sizing: border-box; font-size: 14px; }
-        
-        .qty-controls { display: flex; align-items: center; justify-content: space-between; background: #262626; padding: 5px; border-radius: 12px; margin-top: 10px; }
-        .qty-btn { background: var(--main); border: none; color: white; width: 35px; height: 35px; border-radius: 8px; font-size: 20px; font-weight: bold; cursor: pointer; }
-        .add-btn { background: var(--main); color: white; border: none; padding: 14px; border-radius: 12px; width: 100%; font-weight: bold; font-size: 15px; cursor: pointer; transition: 0.2s; }
-        .add-btn:active { transform: scale(0.98); opacity: 0.9; }
-
-        #orderModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg); z-index: 200; padding: 20px; box-sizing: border-box; flex-direction: column; overflow-y: auto; }
-        .pay-methods { display: flex; gap: 10px; margin: 10px 0 20px 0; }
-        .pay-methods label { flex: 1; background: #222; border: 1px solid #444; padding: 12px; border-radius: 10px; cursor: pointer; text-align: center; color: #fff; }
-        .pay-methods input { display: none; }
-        .pay-methods input:checked + span { color: var(--main); font-weight: bold; }
-        .pay-methods label:has(input:checked) { border-color: var(--main); background: #1a2a35; }
-
-        .cart-bar { position: fixed; bottom: 0; left: 0; right: 0; background: #1c1c1c; padding: 15px 20px; border-top: 1px solid #333; display: none; justify-content: space-between; align-items: center; z-index: 100; box-shadow: 0 -5px 15px rgba(0,0,0,0.5); }
+        .card { background: var(--card); border-radius: 15px; padding: 12px; border: 1px solid #333; }
+        .card img { width: 100%; border-radius: 10px; object-fit: cover; max-height: 200px; display: none; }
+        .price { color: #00d2ff; font-size: 1.3em; font-weight: bold; margin: 10px 0; }
+        select { background: #2a2a2a; color: white; border: 1px solid #444; padding: 8px; border-radius: 8px; width: 100%; margin-bottom: 10px; }
+        .controls { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+        .qty-btn { background: #333; border: 1px solid #444; color: white; width: 35px; height: 35px; border-radius: 10px; border: none; }
+        .add-btn { background: var(--main); color: white; border: none; padding: 10px; border-radius: 10px; flex-grow: 1; font-weight: bold; }
+        .cart-bar { position: fixed; bottom: 0; left: 0; right: 0; background: var(--card); padding: 15px; border-top: 1px solid #333; display: none; justify-content: space-between; align-items: center; z-index: 100; }
+        .checkout-btn { background: #28a745; color: white; border: none; padding: 10px 20px; border-radius: 10px; font-weight: bold; }
     </style>
 </head>
 <body>
     <div class="header"><h2>UA 3D PLUS</h2></div>
-    <div id="catalog">Синхронизация с принтерами...</div>
-
-    <div id="orderModal">
-        <h3 style="text-align:center">Оформление заказа</h3>
-        <div id="summary" style="font-size: 0.9em; color: #bbb; background: #1a1a1a; padding: 15px; border-radius: 12px; margin-bottom: 15px; line-height: 1.5;"></div>
-        
-        <input type="text" id="name" placeholder="ФИО получателя">
-        <input type="text" id="phone" placeholder="Номер телефона">
-        <input type="text" id="address" placeholder="Город и № Новой Почты">
-        <input type="text" id="promo" placeholder="Промокод (если есть)" oninput="applyPromo()">
-        
-        <label>СПОСОБ ОПЛАТЫ:</label>
-        <div class="pay-methods">
-            <label><input type="radio" name="pay_method" value="Предоплата (Mono)" checked><span>💳 Карта</span></label>
-            <label><input type="radio" name="pay_method" value="Наложенный платеж"><span>📦 При получении</span></label>
-        </div>
-
-        <div style="text-align: right; margin-bottom: 20px; font-weight: bold; font-size: 1.3em;">
-            Итого: <span id="finalTotal">0</span> грн
-        </div>
-
-        <button class="add-btn" style="background:var(--success)" onclick="processOrder()">✅ ПОДТВЕРДИТЬ ЗАКАЗ</button>
-        <button onclick="closeModal()" style="background:none; color:#888; border:none; margin-top:15px; width:100%; font-size: 14px;">Вернуться в каталог</button>
-    </div>
-    
+    <div class="categories" id="categories"><button class="cat-btn active" onclick="filterCat('Все')">Все</button></div>
+    <div id="catalog">Загрузка...</div>
     <div class="cart-bar" id="cartBar">
-        <div style="font-size: 1.1em;">Сумма: <span id="totalDisplay" style="font-weight:bold; color:#00d2ff;">0</span> <small>грн</small></div>
-        <button class="add-btn" style="width:auto; padding: 10px 25px;" onclick="openModal()">Оформить</button>
+        <div>Итого: <span id="totalPrice">0</span> грн</div>
+        <button class="checkout-btn" onclick="sendOrder()">Заказать</button>
     </div>
 
 <script>
     let tg = window.Telegram.WebApp;
     tg.expand();
 
-    const CSV_URL = 'https://docs.google.com/spreadsheets/d/1gpBN2dsJNMgDWPSNoBwdeDbYM9PhH-1HiLyoh/pub?output=csv';
-    const BASE_GRAM_PRICE = 6; 
-    let products = [];
+    // ЗАМЕНИТЕ НА ВАШУ ССЫЛКУ CSV
+    const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQp8hJG9TmZSxSbCNLWPuoDwqurKPHA2JwL7B3kJJ5gpBN2dsJNMgDWPSnoBwdeDbYM9PhH-1HiLyoh/pub?output=csv'; 
+    const PRICE_PER_GRAM = 6;
+    let allProducts = [];
     let cart = {};
-    let discount = 1;
 
-    async function load() {
+    async function loadCatalog() {
         try {
-            const res = await fetch(CSV_URL + '&cache=' + Date.now());
-            const text = await res.text();
-            const rows = text.split('\n').slice(1);
-            products = rows.map((r, i) => {
-                const c = r.split(',').map(v => v.trim().replace(/^"|"$/g, ''));
-                if (c.length < 3) return null;
-                return { id: i, name: c[0], weight: parseFloat(c[2]), img: c[3], colors: c[5] ? c[5].split(';') : ['Черный'] };
-            }).filter(p => p);
-            render();
-        } catch (e) { document.getElementById('catalog').innerText = 'Ошибка соединения с базой'; }
+            const response = await fetch(CSV_URL + '&cache=' + new Date().getTime());
+            const data = await response.text();
+            const rows = data.split('\n').filter(row => row.trim() !== '' && !row.includes('{')).slice(1);
+            const cats = new Set();
+            allProducts = rows.map((row, index) => {
+                const col = row.split(',').map(c => c.trim().replace(/^"|"$/g, ''));
+                if (col.length < 3) return null;
+                const p = { id: index, name: col[0], desc: col[1], weight: parseFloat(col[2]), photo: col[3], cat: col[4] || 'Разное', colors: col[5] ? col[5].split(';') : ['Черный'] };
+                if (p.cat) cats.add(p.cat);
+                return p;
+            }).filter(p => p && !isNaN(p.weight));
+            cats.forEach(c => { document.getElementById('categories').innerHTML += `<button class="cat-btn" onclick="filterCat('${c}')">${c}</button>`; });
+            renderProducts('Все');
+        } catch (e) { document.getElementById('catalog').innerText = 'Ошибка загрузки'; }
     }
 
-    function calculatePrice(weight, infill) {
-        let multiplier = 1 + (infill - 20) / 100; 
-        return Math.round(weight * BASE_GRAM_PRICE * multiplier);
-    }
-
-    function render() {
+    function renderProducts(category) {
         let html = '';
-        products.forEach(p => {
-            const count = cart[p.id] ? cart[p.id].qty : 0;
-            const infill = cart[p.id] ? cart[p.id].infill : 40;
-            const price = calculatePrice(p.weight, infill);
+        const filtered = category === 'Все' ? allProducts : allProducts.filter(p => p.cat === category);
+        filtered.forEach(p => {
+            const price = Math.round(p.weight * PRICE_PER_GRAM);
+            const qty = cart[p.id] ? cart[p.id].qty : 0;
+            let options = p.colors.map(c => `<option value="${c}">${c}</option>`).join('');
             html += `<div class="card">
-                <img src="${p.img}" onerror="this.style.display='none'">
-                <h3>${p.name}</h3>
-                <div class="price">${price} грн</div>
-                
-                <label>Цвет:</label>
-                <select id="color-${p.id}" onchange="updateItem(${p.id})">${p.colors.map(c => `<option>${c}</option>`).join('')}</select>
-                
-                <label>Плотность (Infill):</label>
-                <select id="infill-${p.id}" onchange="updateItem(${p.id})">
-                    <option value="15">15% (Декоративная)</option>
-                    <option value="40" selected>40% (Стандарт)</option>
-                    <option value="80">80% (Усиленная)</option>
-                    <option value="100">100% (Макс. прочность)</option>
-                </select>
-
-                <div class="qty-controls">
-                    ${count > 0 ? `
-                        <button class="qty-btn" onclick="changeQty(${p.id}, -1)">-</button>
-                        <span style="font-weight:bold">${count} шт</span>
-                        <button class="qty-btn" onclick="changeQty(${p.id}, 1)">+</button>
-                    ` : `
-                        <button class="add-btn" onclick="changeQty(${p.id}, 1)">Добавить в корзину</button>
-                    `}
-                </div>
-            </div>`;
+                ${p.photo ? `<img src="${p.photo}" style="display:block;" onerror="this.style.display='none'">` : ''}
+                <h3>${p.name}</h3><p>${p.desc}</p><div class="price">${price} грн</div>
+                <select id="color-${p.id}" ${qty > 0 ? 'disabled' : ''}>${options}</select>
+                <div class="controls">
+                    ${qty > 0 ? `<button class="qty-btn" onclick="updateCart(${p.id}, -1)">-</button><span>${qty} шт</span><button class="qty-btn" onclick="updateCart(${p.id}, 1)">+</button>` 
+                    : `<button class="add-btn" onclick="updateCart(${p.id}, 1)">В корзину</button>`}
+                </div></div>`;
         });
         document.getElementById('catalog').innerHTML = html;
     }
 
-    function updateItem(id) {
-        if (cart[id]) {
-            cart[id].color = document.getElementById(`color-${id}`).value;
-            cart[id].infill = document.getElementById(`infill-${id}`).value;
-            cart[id].price = calculatePrice(products.find(x => x.id === id).weight, cart[id].infill);
-            updateCart();
-            render();
-        }
-    }
-
-    function changeQty(id, delta) {
-        const p = products.find(x => x.id === id);
-        if (!cart[id]) {
-            cart[id] = { 
-                name: p.name, qty: 0, 
-                price: calculatePrice(p.weight, document.getElementById(`infill-${id}`).value), 
-                color: document.getElementById(`color-${id}`).value,
-                infill: document.getElementById(`infill-${id}`).value 
-            };
-        }
+    function updateCart(id, delta) {
+        const p = allProducts.find(item => item.id === id);
+        const color = document.getElementById(`color-${id}`).value;
+        if (!cart[id]) cart[id] = { name: p.name, price: Math.round(p.weight * PRICE_PER_GRAM), qty: 0, color: color };
         cart[id].qty += delta;
         if (cart[id].qty <= 0) delete cart[id];
-        updateCart();
-        render();
+        updateUI();
     }
 
-    function updateCart() {
-        let total = 0, hasItems = false;
-        for (let id in cart) { total += cart[id].price * cart[id].qty; hasItems = true; }
-        document.getElementById('totalDisplay').innerText = Math.round(total * discount);
-        document.getElementById('cartBar').style.display = hasItems ? 'flex' : 'none';
+    function updateUI() {
+        let total = 0, count = 0;
+        for (let id in cart) { total += cart[id].price * cart[id].qty; count += cart[id].qty; }
+        document.getElementById('totalPrice').innerText = total;
+        document.getElementById('cartBar').style.display = count > 0 ? 'flex' : 'none';
+        renderProducts(document.querySelector('.cat-btn.active').innerText);
     }
 
-    function applyPromo() {
-        const code = document.getElementById('promo').value.toUpperCase();
-        discount = (code === "VETERAN") ? 0.9 : 1; 
-        updateCart();
-        document.getElementById('finalTotal').innerText = document.getElementById('totalDisplay').innerText;
+    function filterCat(cat) {
+        document.querySelectorAll('.cat-btn').forEach(b => b.classList.toggle('active', b.innerText === cat));
+        renderProducts(cat);
     }
 
-    function openModal() {
-        let text = "";
-        for (let id in cart) { text += `• ${cart[id].name} (${cart[id].color}, ${cart[id].infill}%) x${cart[id].qty}\n`; }
-        document.getElementById('summary').innerText = text;
-        document.getElementById('finalTotal').innerText = document.getElementById('totalDisplay').innerText;
-        document.getElementById('orderModal').style.display = 'flex';
-    }
-
-    function closeModal() { document.getElementById('orderModal').style.display = 'none'; }
-
-    function processOrder() {
-        const name = document.getElementById('name').value;
-        const phone = document.getElementById('phone').value;
-        const method = document.querySelector('input[name="pay_method"]:checked').value;
-
-        if (!name || !phone) return alert("Пожалуйста, заполните ФИО и телефон");
-
-        const orderData = {
-            order: document.getElementById('summary').innerText,
-            total: document.getElementById('finalTotal').innerText,
-            method: method,
-            client: `ФИО: ${name}\nТел: ${phone}\nАдрес: ${document.getElementById('address').value}`
-        };
-
-        if (method === "Предоплата (Mono)") {
-            tg.openLink("https://bank.gov.ua/qr/QkNECjAwMgoxClVDVAoK0KjQuNGC0LDRlNCyINCg0YPRgdC70LDQvSDQktC-0LvQvtC00LjQvNC40YDQvtCy0LjRhwpVQTgzMzIyMDAxMDAwMDAyNjIwNTMwMDA0NTAyNgoKMzAxNjcwODM3MAoKCtCf0L7Qv9C-0LLQvdC10L3QvdGPINGA0LDRhdGD0L3QutGDCgo="); // ЗАМЕНИ НА СВОЮ
-        }
-        
-        tg.sendData(JSON.stringify(orderData));
+    function sendOrder() {
+        let message = "📦 НОВЫЙ ЗАКАЗ:\n";
+        for (let id in cart) { message += `• ${cart[id].name} [${cart[id].color}] — ${cart[id].qty} шт.\n`; }
+        message += `\n💰 Итого: ${document.getElementById('totalPrice').innerText} грн`;
+        tg.sendData(message);
         tg.close();
     }
-    load();
+    loadCatalog();
 </script>
 </body>
 </html>
