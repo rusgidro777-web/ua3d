@@ -7,14 +7,14 @@
     <style>
         :root { --main: #00CCFF; --bg: #121212; --card: #1e1e1e; }
         body { font-family: sans-serif; background: var(--bg); color: white; margin: 0; padding-bottom: 20px; }
-        .categories { display: flex; gap: 10px; overflow-x: auto; padding: 15px; background: #1a1a1a; position: sticky; top: 0; z-index: 10; scrollbar-width: none; }
+        .categories { display: flex; gap: 10px; overflow-x: auto; padding: 15px; background: #1a1a1a; position: sticky; top: 0; z-index: 10; scrollbar-width: none; border-bottom: 1px solid #333; }
         .cat-btn { background: #333; color: #ccc; border: none; padding: 8px 18px; border-radius: 20px; white-space: nowrap; cursor: pointer; font-size: 14px; }
         .cat-btn.active { background: var(--main); color: #000; font-weight: bold; }
         .card { background: var(--card); border-radius: 15px; padding: 15px; margin: 12px; border: 1px solid #333; }
-        .card img { width: 100%; border-radius: 10px; margin-bottom: 12px; }
+        .card img { width: 100%; border-radius: 10px; margin-bottom: 12px; aspect-ratio: 1/1; object-fit: cover; }
         .price-tag { font-size: 1.2em; color: var(--main); font-weight: bold; margin: 10px 0; }
         input, select { background: #2a2a2a; color: white; border: 1px solid #444; padding: 12px; width: 100%; border-radius: 10px; margin-bottom: 10px; box-sizing: border-box; font-size: 14px; }
-        .btn { background: var(--main); color: #000; border: none; padding: 15px; width: 100%; border-radius: 10px; font-weight: bold; cursor: pointer; font-size: 16px; text-transform: uppercase; }
+        .btn { background: var(--main); color: #000; border: none; padding: 15px; width: 100%; border-radius: 10px; font-weight: bold; cursor: pointer; font-size: 16px; }
     </style>
 </head>
 <body>
@@ -26,7 +26,7 @@
         tg.expand();
         
         const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQp8hJG9TmZSxSbCNLWPuoDwqurKPHA2JwL7B3kJJ5gpBN2dsJNMgDWPSnoBwdeDbYM9PhH-1HiLyoh/pub?output=csv';
-        const PRICE_PER_GRAM = 6; // Твоя цена за 1 грамм печати
+        const PRICE_PER_GRAM = 6; 
         let allProducts = [];
 
         async function loadData() {
@@ -34,63 +34,57 @@
                 const res = await fetch(CSV_URL + '&cache=' + Date.now());
                 const text = await res.text();
                 const rows = text.split('\n').slice(1);
+                
                 allProducts = rows.map(r => {
                     const c = r.split(',').map(v => v.trim().replace(/^"|"$/g, ''));
+                    // Сопоставляем с твоей таблицей (image_97.png)
                     return { 
-                        name: c[0], 
-                        cat: c[1] || 'Общее', 
-                        weight: parseFloat(c[2]) || 0, // Вес из 3-й колонки
-                        img: c[3] 
+                        name: c[0],               // A: Название
+                        weight: parseFloat(c[2]) || 0, // C: Вес
+                        img: c[3],                // D: Фото
+                        cat: c[4] || 'Разное',    // E: Категория
+                        colors: c[5] ? c[5].split(';') : ['Черный'] // F: Цвета (через точку с запятой или запятую)
                     };
                 }).filter(p => p.name);
                 render('Все');
-            } catch (e) { document.getElementById('catalog').innerText = 'Ошибка таблицы'; }
+            } catch (e) { document.getElementById('catalog').innerText = 'Ошибка загрузки'; }
         }
 
         function render(filter) {
-            const cats = ['Все', ...new Set(allProducts.map(p => p.cat))];
-            document.getElementById('cat-list').innerHTML = cats.map(c => 
+            const uniqueCats = ['Все', ...new Set(allProducts.map(p => p.cat))];
+            document.getElementById('cat-list').innerHTML = uniqueCats.map(c => 
                 `<button class="cat-btn ${filter === c ? 'active' : ''}" onclick="render('${c}')">${c}</button>`
             ).join('');
 
             const filtered = filter === 'Все' ? allProducts : allProducts.filter(p => p.cat === filter);
             document.getElementById('catalog').innerHTML = filtered.map(p => {
                 const finalPrice = Math.round(p.weight * PRICE_PER_GRAM);
+                const colorOptions = p.colors.map(col => `<option value="${col}">${col}</option>`).join('');
+                
                 return `
                 <div class="card">
-                    <img src="${p.img}" onerror="this.src='https://via.placeholder.com/300x200?text=UA3D'">
+                    <img src="${p.img}" onerror="this.src='https://via.placeholder.com/300?text=UA3D'">
                     <h3>${p.name}</h3>
                     <div class="price-tag">Цена: ${finalPrice} грн</div>
                     
-                    <select id="col-${p.name}">
-                        <option value="Черный">Цвет: Черный</option>
-                        <option value="Белый">Цвет: Белый</option>
-                        <option value="Серый">Цвет: Серый</option>
-                    </select>
+                    <select id="col-${p.name}">${colorOptions}</select>
 
                     <input type="text" id="n-${p.name}" placeholder="ФИО">
                     <input type="text" id="ph-${p.name}" placeholder="Телефон">
                     <input type="text" id="ad-${p.name}" placeholder="Город и № почты">
                     <select id="m-${p.name}"><option>Карта</option><option>Наложенный</option></select>
                     
-                    <button class="btn" onclick="send('${p.name}', ${finalPrice})">ОФОРМИТЬ</button>
+                    <button class="btn" onclick="send('${p.name}', ${finalPrice})">ЗАКАЗАТЬ</button>
                 </div>`;
             }).join('');
         }
 
         function send(name, price) {
-            const f_name = document.getElementById('n-'+name).value;
-            const f_phone = document.getElementById('ph-'+name).value;
-            const f_addr = document.getElementById('ad-'+name).value;
-            const f_color = document.getElementById('col-'+name).value;
-
-            if(!f_name || !f_phone || !f_addr) return alert("Заполните данные доставки!");
-
             const data = {
-                order: `${name} (Цвет: ${f_color})`,
+                order: `${name} (${document.getElementById('col-'+name).value})`,
                 total: price,
                 method: document.getElementById('m-'+name).value,
-                client: `ФИО: ${f_name}\nТел: ${f_phone}\nДоставка: ${f_addr}`
+                client: `👤 ${document.getElementById('n-'+name).value}\n📞 ${document.getElementById('ph-'+name).value}\n📍 ${document.getElementById('ad-'+name).value}`
             };
             tg.sendData(JSON.stringify(data));
             tg.close();
