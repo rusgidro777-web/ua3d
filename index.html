@@ -5,25 +5,28 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        :root { --main: #0088cc; --bg: #121212; --card: #1e1e1e; }
+        :root { --main: #00CCFF; --bg: #121212; --card: #1e1e1e; }
         body { font-family: sans-serif; background: var(--bg); color: white; margin: 0; padding-bottom: 20px; }
-        .categories { display: flex; gap: 10px; overflow-x: auto; padding: 10px; background: #1a1a1a; position: sticky; top: 0; z-index: 10; }
-        .cat-btn { background: #333; color: #ccc; border: none; padding: 8px 15px; border-radius: 20px; white-space: nowrap; cursor: pointer; }
-        .cat-btn.active { background: var(--main); color: white; }
-        .card { background: var(--card); border-radius: 12px; padding: 15px; margin: 10px; border: 1px solid #333; }
-        .card img { width: 100%; border-radius: 8px; margin-bottom: 10px; }
-        input, select { background: #2a2a2a; color: white; border: 1px solid #444; padding: 12px; width: 100%; border-radius: 10px; margin-bottom: 10px; box-sizing: border-box; }
-        .btn { background: var(--main); color: white; border: none; padding: 15px; width: 100%; border-radius: 10px; font-weight: bold; cursor: pointer; }
+        .categories { display: flex; gap: 10px; overflow-x: auto; padding: 15px; background: #1a1a1a; position: sticky; top: 0; z-index: 10; scrollbar-width: none; }
+        .cat-btn { background: #333; color: #ccc; border: none; padding: 8px 18px; border-radius: 20px; white-space: nowrap; cursor: pointer; font-size: 14px; }
+        .cat-btn.active { background: var(--main); color: #000; font-weight: bold; }
+        .card { background: var(--card); border-radius: 15px; padding: 15px; margin: 12px; border: 1px solid #333; }
+        .card img { width: 100%; border-radius: 10px; margin-bottom: 12px; }
+        .price-tag { font-size: 1.2em; color: var(--main); font-weight: bold; margin: 10px 0; }
+        input, select { background: #2a2a2a; color: white; border: 1px solid #444; padding: 12px; width: 100%; border-radius: 10px; margin-bottom: 10px; box-sizing: border-box; font-size: 14px; }
+        .btn { background: var(--main); color: #000; border: none; padding: 15px; width: 100%; border-radius: 10px; font-weight: bold; cursor: pointer; font-size: 16px; text-transform: uppercase; }
     </style>
 </head>
 <body>
     <div class="categories" id="cat-list"></div>
-    <div id="catalog">Загрузка товаров...</div>
+    <div id="catalog">Загрузка...</div>
 
     <script>
         let tg = window.Telegram.WebApp;
         tg.expand();
+        
         const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQp8hJG9TmZSxSbCNLWPuoDwqurKPHA2JwL7B3kJJ5gpBN2dsJNMgDWPSnoBwdeDbYM9PhH-1HiLyoh/pub?output=csv';
+        const PRICE_PER_GRAM = 6; // Твоя цена за 1 грамм печати
         let allProducts = [];
 
         async function loadData() {
@@ -33,10 +36,15 @@
                 const rows = text.split('\n').slice(1);
                 allProducts = rows.map(r => {
                     const c = r.split(',').map(v => v.trim().replace(/^"|"$/g, ''));
-                    return { name: c[0], cat: c[1] || 'Общее', price: c[2] || '0', img: c[3] };
+                    return { 
+                        name: c[0], 
+                        cat: c[1] || 'Общее', 
+                        weight: parseFloat(c[2]) || 0, // Вес из 3-й колонки
+                        img: c[3] 
+                    };
                 }).filter(p => p.name);
                 render('Все');
-            } catch (e) { document.getElementById('catalog').innerText = 'Ошибка загрузки таблицы'; }
+            } catch (e) { document.getElementById('catalog').innerText = 'Ошибка таблицы'; }
         }
 
         function render(filter) {
@@ -46,31 +54,42 @@
             ).join('');
 
             const filtered = filter === 'Все' ? allProducts : allProducts.filter(p => p.cat === filter);
-            document.getElementById('catalog').innerHTML = filtered.map(p => `
+            document.getElementById('catalog').innerHTML = filtered.map(p => {
+                const finalPrice = Math.round(p.weight * PRICE_PER_GRAM);
+                return `
                 <div class="card">
-                    <img src="${p.img}" onerror="this.src='https://via.placeholder.com/150'">
+                    <img src="${p.img}" onerror="this.src='https://via.placeholder.com/300x200?text=UA3D'">
                     <h3>${p.name}</h3>
-                    <p>Цена: ${p.price} грн</p>
-                    <input type="text" id="name-${p.name}" placeholder="ФИО получателя">
-                    <input type="text" id="phone-${p.name}" placeholder="Телефон">
-                    <input type="text" id="addr-${p.name}" placeholder="Город и № Новой Почты">
-                    <select id="pay-${p.name}"><option>Карта (Mono)</option><option>Наложенный платеж</option></select>
-                    <button class="btn" onclick="send('${p.name}', '${p.price}')">ОФОРМИТЬ ЗАКАЗ</button>
-                </div>
-            `).join('');
+                    <div class="price-tag">Цена: ${finalPrice} грн</div>
+                    
+                    <select id="col-${p.name}">
+                        <option value="Черный">Цвет: Черный</option>
+                        <option value="Белый">Цвет: Белый</option>
+                        <option value="Серый">Цвет: Серый</option>
+                    </select>
+
+                    <input type="text" id="n-${p.name}" placeholder="ФИО">
+                    <input type="text" id="ph-${p.name}" placeholder="Телефон">
+                    <input type="text" id="ad-${p.name}" placeholder="Город и № почты">
+                    <select id="m-${p.name}"><option>Карта</option><option>Наложенный</option></select>
+                    
+                    <button class="btn" onclick="send('${p.name}', ${finalPrice})">ОФОРМИТЬ</button>
+                </div>`;
+            }).join('');
         }
 
         function send(name, price) {
-            const f_name = document.getElementById('name-'+name).value;
-            const f_phone = document.getElementById('phone-'+name).value;
-            const f_addr = document.getElementById('addr-'+name).value;
+            const f_name = document.getElementById('n-'+name).value;
+            const f_phone = document.getElementById('ph-'+name).value;
+            const f_addr = document.getElementById('ad-'+name).value;
+            const f_color = document.getElementById('col-'+name).value;
 
-            if(!f_name || !f_phone || !f_addr) return alert("Пожалуйста, заполните все поля доставки!");
+            if(!f_name || !f_phone || !f_addr) return alert("Заполните данные доставки!");
 
             const data = {
-                order: name,
+                order: `${name} (Цвет: ${f_color})`,
                 total: price,
-                method: document.getElementById('pay-'+name).value,
+                method: document.getElementById('m-'+name).value,
                 client: `ФИО: ${f_name}\nТел: ${f_phone}\nДоставка: ${f_addr}`
             };
             tg.sendData(JSON.stringify(data));
